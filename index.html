@@ -1,0 +1,2623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>D02 · Raycast 暗黑硬件路由 · 智能道岔分流</title>
+  <link rel="preload" href="./assets/RouHei.ttf" as="font" type="font/ttf" crossorigin />
+  <style>
+    @font-face {
+      font-family: 'RouHei';
+      src: url('./assets/RouHei.ttf') format('truetype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: block;
+    }
+
+    :root {
+      --bg-void: #040508;
+      --cyan: #2FE0D0;
+      --cyan-bright: #98FAF0;
+      --amber: #F5A623;
+      --amber-bright: #FFD482;
+      --emerald: #10B981;
+      --text-primary: #F8FAFC;
+      --text-secondary: rgba(203, 213, 225, 0.74);
+      --text-muted: rgba(148, 163, 184, 0.5);
+      --font-sans: 'RouHei', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+      --font-mono: 'SF Mono', 'JetBrains Mono', ui-monospace, 'Menlo', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      font-synthesis: none;
+    }
+
+    html, body {
+      width: 100%;
+      min-height: 100vh;
+      background:
+        radial-gradient(920px 620px at 36% 18%, rgba(47, 224, 208, 0.05), transparent 70%),
+        radial-gradient(820px 620px at 72% 82%, rgba(245, 166, 35, 0.035), transparent 70%),
+        var(--bg-void);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-weight: 400;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+    }
+
+    .studio-shell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      padding: 28px 32px;
+      position: relative;
+    }
+
+    /* ?shot=1 Pure Centered Stage Mode */
+    body.shot-mode {
+      min-height: 100vh;
+      height: 100vh;
+      overflow: hidden;
+      background: #030407;
+    }
+    body.shot-mode .studio-shell {
+      padding: 0;
+      gap: 0;
+    }
+    body.shot-mode .control-dock {
+      display: none !important;
+    }
+    body.shot-mode .frame-bezel {
+      box-shadow:
+        0 28px 70px rgba(0, 0, 0, 0.92),
+        0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+
+    /* Double-Bezel Machined Outer Shell */
+    .frame-bezel {
+      padding: 6px;
+      border-radius: 38px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.085) 0%, rgba(255, 255, 255, 0.022) 48%, rgba(255, 255, 255, 0.045) 100%);
+      box-shadow:
+        0 40px 90px -20px rgba(0, 0, 0, 0.92),
+        0 12px 32px rgba(0, 0, 0, 0.65),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16);
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    /* Exact 540x960 9:16 Vertical Stage */
+    .phone-stage {
+      width: 540px;
+      height: 960px;
+      border-radius: 32px;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(390px 220px at 34% 6%, rgba(47, 224, 208, 0.09), transparent 72%),
+        radial-gradient(350px 260px at 78% 55%, rgba(245, 166, 35, 0.052), transparent 75%),
+        radial-gradient(380px 180px at 50% 96%, rgba(47, 224, 208, 0.05), transparent 75%),
+        linear-gradient(180deg, #090C14 0%, #06080E 54%, #05070C 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.055);
+      padding: 24px 18px 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      user-select: none;
+    }
+
+    .phone-stage::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 16%;
+      right: 16%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38) 35%, rgba(139, 248, 238, 0.6) 50%, rgba(255, 255, 255, 0.38) 65%, transparent);
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .noise-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 4;
+      opacity: 0.03;
+      mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 160px 160px;
+    }
+
+    /* 1. Top 6-Item Lightweight Navigation */
+    .top-nav {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 4px;
+      height: 36px;
+      align-items: center;
+      padding: 0 2px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      position: relative;
+      z-index: 6;
+      flex-shrink: 0;
+    }
+
+    .nav-item {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-size: 12px;
+      color: rgba(203, 213, 225, 0.4);
+      position: relative;
+    }
+
+    .nav-item .nav-idx {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      opacity: 0.8;
+    }
+
+    .nav-item.active {
+      color: var(--cyan);
+    }
+
+    .nav-item.active .nav-idx {
+      color: var(--cyan-bright);
+      opacity: 1;
+    }
+
+    .nav-item.active::before {
+      content: '';
+      position: absolute;
+      inset: 3px 2px 5px;
+      border-radius: 8px;
+      background: radial-gradient(ellipse at 50% 100%, rgba(47, 224, 208, 0.14), rgba(47, 224, 208, 0.02) 75%);
+      pointer-events: none;
+    }
+
+    .nav-item.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 10px;
+      right: 10px;
+      height: 2px;
+      border-radius: 2px;
+      background: var(--cyan);
+      box-shadow:
+        0 0 10px rgba(47, 224, 208, 0.88),
+        0 2px 14px rgba(47, 224, 208, 0.55);
+    }
+
+    /* 2. Metallic Title & Subtitle Block */
+    .hero-header {
+      padding: 0 4px;
+      position: relative;
+      z-index: 6;
+      flex-shrink: 0;
+    }
+
+    .eyebrow-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 7px;
+    }
+
+    .eyebrow-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      color: rgba(152, 250, 240, 0.78);
+    }
+
+    .eyebrow-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+    }
+
+    .eyebrow-meta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      color: rgba(148, 163, 184, 0.46);
+    }
+
+    .hero-title {
+      font-size: 30px;
+      line-height: 1.24;
+      letter-spacing: 0.01em;
+      background: linear-gradient(180deg, #FFFFFF 0%, #F1F5F9 50%, #94A3B8 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.55));
+    }
+
+    .hero-title .accent-metal {
+      background: linear-gradient(180deg, #ECFFFD 0%, #9FF8EE 55%, #3ED2C2 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .hero-subtitle {
+      margin-top: 8px;
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: rgba(203, 213, 225, 0.74);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    .inline-kbd {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1px 6px;
+      border-radius: 5px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--cyan-bright);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.04));
+      border: 1px solid rgba(47, 224, 208, 0.3);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 2px 5px rgba(0, 0, 0, 0.35);
+    }
+
+    .sub-arrow {
+      color: rgba(47, 224, 208, 0.65);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    /* 3. Central Exact 504x452 Deep-Space Glass Showcase Window */
+    .showcase-window {
+      width: 504px;
+      height: 452px;
+      border-radius: 22px;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(310px 115px at 50% 0%, rgba(47, 224, 208, 0.1), transparent 76%),
+        radial-gradient(240px 180px at 84% 78%, rgba(245, 166, 35, 0.06), transparent 75%),
+        linear-gradient(180deg, rgba(17, 22, 33, 0.93) 0%, rgba(9, 12, 19, 0.97) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow:
+        0 26px 52px -14px rgba(0, 0, 0, 0.84),
+        0 6px 18px rgba(0, 0, 0, 0.52),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      z-index: 6;
+      flex-shrink: 0;
+    }
+
+    /* 1px Centered Mirror Top Highlight */
+    .showcase-window::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 10%;
+      right: 10%;
+      height: 1px;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.26) 28%,
+        rgba(175, 252, 245, 0.76) 50%,
+        rgba(255, 255, 255, 0.26) 72%,
+        transparent 100%
+      );
+      z-index: 14;
+      pointer-events: none;
+    }
+
+    .showcase-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+      background-size: 24px 24px;
+      mask-image: radial-gradient(ellipse 85% 80% at 50% 52%, #000 35%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 85% 80% at 50% 52%, #000 35%, transparent 100%);
+      pointer-events: none;
+    }
+
+    /* --- SHOWCASE SUB-MODULE A: Raycast Dark Command Palette --- */
+    .raycast-bar {
+      position: absolute;
+      left: 14px;
+      top: 14px;
+      width: 476px;
+      height: 108px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(26, 33, 47, 0.95) 0%, rgba(15, 20, 30, 0.98) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.105);
+      box-shadow:
+        0 14px 30px rgba(0, 0, 0, 0.58),
+        inset 0 1px 0 rgba(255, 255, 255, 0.13);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 8;
+      will-change: transform, opacity;
+    }
+
+    .rc-input-row {
+      height: 40px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.068);
+      background: rgba(255, 255, 255, 0.018);
+    }
+
+    .rc-prompt-wrap {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .rc-search-icon {
+      width: 16px;
+      height: 16px;
+      color: var(--cyan);
+      flex-shrink: 0;
+      filter: drop-shadow(0 0 6px rgba(47, 224, 208, 0.48));
+    }
+
+    .rc-query-text {
+      font-size: 13px;
+      color: #F8FAFC;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .rc-caret {
+      display: inline-block;
+      width: 1.5px;
+      height: 14px;
+      background: var(--cyan);
+      vertical-align: -2px;
+      margin-left: 2px;
+      box-shadow: 0 0 6px var(--cyan);
+    }
+
+    .rc-shortcut-group {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    .rc-badge-kbd {
+      height: 21px;
+      padding: 0 7px;
+      border-radius: 5px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.035));
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 2px rgba(0, 0, 0, 0.4);
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--cyan-bright);
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .rc-badge-esc {
+      height: 21px;
+      padding: 0 6px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.075);
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      color: rgba(148, 163, 184, 0.68);
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .rc-candidates {
+      flex: 1;
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      justify-content: center;
+    }
+
+    .rc-item {
+      height: 26px;
+      padding: 0 9px;
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11.5px;
+      position: relative;
+    }
+
+    .rc-item.selected {
+      background: linear-gradient(90deg, rgba(47, 224, 208, 0.14) 0%, rgba(245, 166, 35, 0.075) 68%, rgba(255, 255, 255, 0.03) 100%);
+      border: 1px solid rgba(47, 224, 208, 0.24);
+      color: #F1F5F9;
+    }
+
+    .rc-item.selected::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 5px;
+      bottom: 5px;
+      width: 2.5px;
+      border-radius: 2px;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+    }
+
+    .rc-item.secondary {
+      color: rgba(148, 163, 184, 0.7);
+      border: 1px solid transparent;
+    }
+
+    .rc-item-left {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .rc-item-dot {
+      width: 15px;
+      height: 15px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(47, 224, 208, 0.16);
+      color: var(--cyan-bright);
+      font-family: var(--font-mono);
+      font-size: 9px;
+    }
+
+    .rc-item.secondary .rc-item-dot {
+      background: rgba(255, 255, 255, 0.055);
+      color: rgba(148, 163, 184, 0.72);
+    }
+
+    .rc-item-right {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+
+    .rc-pill-cyan {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(47, 224, 208, 0.16);
+      color: var(--cyan-bright);
+      border: 1px solid rgba(47, 224, 208, 0.3);
+    }
+
+    .rc-pill-amber {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(245, 166, 35, 0.16);
+      color: var(--amber-bright);
+      border: 1px solid rgba(245, 166, 35, 0.3);
+    }
+
+    .rc-pill-muted {
+      color: rgba(148, 163, 184, 0.58);
+      font-family: var(--font-sans);
+      font-size: 10.5px;
+    }
+
+    /* --- SHOWCASE SUB-MODULE B: Fiber-Optic SVG Layers --- */
+    .fiber-svg-bg {
+      position: absolute;
+      inset: 0;
+      width: 504px;
+      height: 452px;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .fiber-svg-fg {
+      position: absolute;
+      inset: 0;
+      width: 504px;
+      height: 452px;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* --- SHOWCASE SUB-MODULE C: Hyper-Realistic 3D Mechanical Keycaps (⌘ K) --- */
+    .keycap-unit {
+      position: absolute;
+      left: 14px;
+      top: 148px;
+      width: 110px;
+      z-index: 9;
+      cursor: pointer;
+      will-change: transform, opacity;
+    }
+
+    .keywell-chassis {
+      width: 110px;
+      height: 70px;
+      padding: 7px;
+      border-radius: 15px;
+      background: linear-gradient(180deg, #06080D 0%, #0C111B 100%);
+      border: 1px solid rgba(47, 224, 208, 0.16);
+      box-shadow:
+        inset 0 4px 10px rgba(0, 0, 0, 0.96),
+        0 12px 24px rgba(0, 0, 0, 0.7),
+        0 0 22px rgba(47, 224, 208, 0.1),
+        0 1px 0 rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      position: relative;
+    }
+
+    /* Diffused Cyan Switch Underglow LED */
+    .keywell-led {
+      position: absolute;
+      inset: 2px;
+      border-radius: 13px;
+      background: radial-gradient(circle at 50% 72%, rgba(47, 224, 208, 0.85), rgba(47, 224, 208, 0.25) 58%, transparent 82%);
+      filter: blur(6px);
+      opacity: 0.62;
+      pointer-events: none;
+      transition: opacity 0.12s ease;
+    }
+
+    .mech-key {
+      width: 44px;
+      height: 50px;
+      border-radius: 10px;
+      position: relative;
+      /* Chamfered Metallic Bevel Base */
+      background: linear-gradient(180deg, #3B465E 0%, #1E2636 55%, #111824 100%);
+      box-shadow:
+        0 5px 0 #070A10,
+        0 7px 12px rgba(0, 0, 0, 0.9),
+        inset 0 1px 0 rgba(255, 255, 255, 0.34),
+        inset 0 -1px 0 rgba(47, 224, 208, 0.38);
+      padding: 4px 4px 6px;
+      transform: translateY(0px);
+      will-change: transform, box-shadow;
+    }
+
+    /* Micro-Concave Finger Dish Top */
+    .mech-key-top {
+      width: 100%;
+      height: 100%;
+      border-radius: 7px;
+      background: radial-gradient(115% 100% at 50% 16%, #141923 0%, #1E2636 66%, #2C374D 100%);
+      box-shadow:
+        inset 0 2.5px 4px rgba(0, 0, 0, 0.72),
+        inset 0 -1px 1px rgba(152, 250, 240, 0.14),
+        0 1px 0 rgba(255, 255, 255, 0.12);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .key-sub-legend {
+      font-family: var(--font-mono);
+      font-size: 7px;
+      letter-spacing: 0.06em;
+      color: rgba(148, 163, 184, 0.68);
+      line-height: 1;
+      margin-bottom: 2px;
+    }
+
+    .key-main-legend {
+      font-family: var(--font-mono);
+      font-size: 16.5px;
+      line-height: 1;
+      color: #ECFEFC;
+      text-shadow: 0 0 8px rgba(47, 224, 208, 0.42);
+      transition: color 0.15s ease, text-shadow 0.15s ease;
+    }
+
+    .keycap-unit.pressed .mech-key,
+    .keycap-unit:active .mech-key {
+      transform: translateY(3.5px) !important;
+      box-shadow:
+        0 1.5px 0 #070A10,
+        0 3px 6px rgba(0, 0, 0, 0.75),
+        inset 0 1px 0 rgba(152, 250, 240, 0.5),
+        0 0 16px rgba(47, 224, 208, 0.48) !important;
+    }
+
+    .keycap-unit.pressed .key-main-legend,
+    .keycap-unit:hover .key-main-legend {
+      color: var(--cyan-bright);
+      text-shadow: 0 0 12px rgba(47, 224, 208, 0.92);
+    }
+
+    .keycap-caption {
+      margin-top: 7px;
+      text-align: center;
+      font-size: 10px;
+      color: rgba(148, 163, 184, 0.72);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .keycap-caption-dot {
+      width: 4.5px;
+      height: 4.5px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 6px var(--cyan);
+    }
+
+    /* --- SHOWCASE SUB-MODULE D: Central Precision Router Core (Center X = 198) --- */
+    .router-module {
+      position: absolute;
+      left: 132px;
+      top: 145px;
+      width: 132px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 8;
+      will-change: transform, opacity;
+    }
+
+    .router-dial {
+      width: 92px;
+      height: 92px;
+      border-radius: 50%;
+      position: relative;
+      background: radial-gradient(circle at 50% 42%, #151E2E 0%, #0A0E17 68%, #06090F 100%);
+      box-shadow:
+        0 14px 28px rgba(0, 0, 0, 0.8),
+        0 0 26px rgba(47, 224, 208, 0.14),
+        inset 0 1px 1px rgba(255, 255, 255, 0.18),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .router-svg {
+      position: absolute;
+      inset: 0;
+      width: 92px;
+      height: 92px;
+      overflow: visible;
+    }
+
+    .router-core-cap {
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 50% 30%, #1F2A3E 0%, #0B0F18 82%);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow:
+        0 4px 10px rgba(0, 0, 0, 0.82),
+        inset 0 1px 0 rgba(255, 255, 255, 0.22);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      z-index: 3;
+    }
+
+    .router-prism-icon {
+      width: 15px;
+      height: 15px;
+      color: var(--cyan-bright);
+      filter: drop-shadow(0 0 5px rgba(47, 224, 208, 0.65));
+    }
+
+    .router-core-label {
+      font-family: var(--font-mono);
+      font-size: 7.5px;
+      letter-spacing: 0.11em;
+      color: #DBEAFE;
+    }
+
+    .router-readout {
+      margin-top: 7px;
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: rgba(12, 17, 27, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      color: rgba(226, 232, 240, 0.88);
+      white-space: nowrap;
+    }
+
+    .router-conf-num {
+      font-family: var(--font-mono);
+      color: var(--cyan-bright);
+      font-size: 10.5px;
+    }
+
+    /* --- SHOWCASE SUB-MODULE E: Top-Right FAST Light Model Card --- */
+    .fast-card {
+      position: absolute;
+      left: 314px;
+      top: 136px;
+      width: 176px;
+      height: 138px;
+      border-radius: 16px;
+      padding: 12px 13px 11px;
+      background:
+        radial-gradient(140px 90px at 85% 12%, rgba(47, 224, 208, 0.17), transparent 72%),
+        linear-gradient(165deg, rgba(16, 34, 42, 0.88) 0%, rgba(10, 15, 23, 0.96) 68%);
+      border: 1px solid rgba(47, 224, 208, 0.28);
+      box-shadow:
+        0 14px 30px rgba(0, 0, 0, 0.62),
+        inset 0 1px 0 rgba(152, 250, 240, 0.26);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      z-index: 8;
+      will-change: transform, opacity;
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .badge-fast {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 20px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: rgba(47, 224, 208, 0.14);
+      border: 1px solid rgba(47, 224, 208, 0.34);
+      font-size: 10.5px;
+      color: var(--cyan-bright);
+    }
+
+    .badge-fast-code {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      letter-spacing: 0.05em;
+    }
+
+    .icon-well-cyan {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(47, 224, 208, 0.22), rgba(47, 224, 208, 0.05));
+      border: 1px solid rgba(47, 224, 208, 0.32);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--cyan-bright);
+      box-shadow: 0 0 12px rgba(47, 224, 208, 0.22);
+    }
+
+    .fast-metric-row {
+      display: flex;
+      align-items: baseline;
+      gap: 7px;
+      margin-top: 2px;
+    }
+
+    .fast-big-num {
+      font-family: var(--font-mono);
+      font-size: 29px;
+      line-height: 1;
+      letter-spacing: -0.03em;
+      background: linear-gradient(180deg, #FFFFFF 0%, #98FAF0 65%, #2FE0D0 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 12px rgba(47, 224, 208, 0.34));
+    }
+
+    .fast-unit-note {
+      font-size: 11px;
+      color: rgba(203, 213, 225, 0.74);
+    }
+
+    .latency-block {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .latency-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: rgba(148, 163, 184, 0.7);
+      letter-spacing: 0.04em;
+    }
+
+    .latency-bars {
+      height: 20px;
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 3px;
+      align-items: end;
+      padding: 3px 5px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.34);
+      border: 1px solid rgba(255, 255, 255, 0.055);
+    }
+
+    .lat-bar {
+      width: 100%;
+      border-radius: 2px;
+      background: linear-gradient(180deg, #98FAF0 0%, rgba(47, 224, 208, 0.36) 100%);
+      transform-origin: bottom center;
+      will-change: transform, opacity;
+    }
+
+    /* --- SHOWCASE SUB-MODULE F: Bottom-Right DEEP Reasoning Chain Card --- */
+    .deep-card {
+      position: absolute;
+      left: 314px;
+      top: 288px;
+      width: 176px;
+      height: 150px;
+      border-radius: 16px;
+      padding: 11px 12px 10px;
+      background:
+        radial-gradient(140px 90px at 88% 12%, rgba(245, 166, 35, 0.17), transparent 72%),
+        linear-gradient(165deg, rgba(40, 27, 14, 0.86) 0%, rgba(10, 14, 22, 0.96) 68%);
+      border: 1px solid rgba(245, 166, 35, 0.3);
+      box-shadow:
+        0 14px 30px rgba(0, 0, 0, 0.64),
+        inset 0 1px 0 rgba(255, 212, 130, 0.26);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      z-index: 8;
+      will-change: transform, opacity;
+    }
+
+    .badge-deep {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 20px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: rgba(245, 166, 35, 0.14);
+      border: 1px solid rgba(245, 166, 35, 0.35);
+      font-size: 10.5px;
+      color: var(--amber-bright);
+    }
+
+    .icon-well-amber {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(245, 166, 35, 0.22), rgba(245, 166, 35, 0.05));
+      border: 1px solid rgba(245, 166, 35, 0.34);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--amber-bright);
+      box-shadow: 0 0 12px rgba(245, 166, 35, 0.2);
+    }
+
+    .deep-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-top: 4px;
+    }
+
+    .deep-step {
+      height: 28px;
+      padding: 0 8px;
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.055);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: rgba(226, 232, 240, 0.52);
+      transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+    }
+
+    .deep-step.done {
+      background: linear-gradient(90deg, rgba(245, 166, 35, 0.13), rgba(255, 255, 255, 0.025));
+      border-color: rgba(245, 166, 35, 0.3);
+      color: #F8FAFC;
+    }
+
+    .step-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .step-check {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: transparent;
+      background: rgba(0, 0, 0, 0.25);
+    }
+
+    .deep-step.done .step-check {
+      background: rgba(245, 166, 35, 0.24);
+      border-color: var(--amber-bright);
+      color: var(--amber-bright);
+      box-shadow: 0 0 8px rgba(245, 166, 35, 0.4);
+    }
+
+    .step-time {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: rgba(148, 163, 184, 0.55);
+    }
+
+    .deep-step.done .step-time {
+      color: var(--amber-bright);
+    }
+
+    .step-pass-tag {
+      font-size: 9.5px;
+      color: #6EE7B7;
+      background: rgba(16, 185, 129, 0.14);
+      border: 1px solid rgba(16, 185, 129, 0.28);
+      padding: 0 5px;
+      border-radius: 4px;
+      line-height: 16px;
+    }
+
+    /* --- SHOWCASE SUB-MODULE G: Bottom-Left routing.log Live Terminal --- */
+    .terminal-card {
+      position: absolute;
+      left: 14px;
+      top: 288px;
+      width: 266px;
+      height: 150px;
+      border-radius: 15px;
+      background: linear-gradient(180deg, rgba(11, 15, 24, 0.96) 0%, rgba(6, 9, 14, 0.99) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.095);
+      box-shadow:
+        0 14px 28px rgba(0, 0, 0, 0.64),
+        inset 0 1px 0 rgba(255, 255, 255, 0.085);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 8;
+      will-change: transform, opacity;
+    }
+
+    .term-header {
+      height: 29px;
+      padding: 0 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.068);
+      background: rgba(255, 255, 255, 0.022);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .term-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: #CBD5E1;
+    }
+
+    .term-prompt-sym {
+      color: var(--cyan);
+      font-size: 10px;
+    }
+
+    .live-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(16, 185, 129, 0.13);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      color: #34D399;
+    }
+
+    .live-dot {
+      width: 5.5px;
+      height: 5.5px;
+      border-radius: 50%;
+      background: #10B981;
+      box-shadow: 0 0 8px #10B981;
+    }
+
+    .term-body {
+      flex: 1;
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+      overflow: hidden;
+    }
+
+    .log-row {
+      height: 30px;
+      padding: 0 6px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.024);
+      border: 1px solid rgba(255, 255, 255, 0.042);
+      display: grid;
+      grid-template-columns: 44px 34px 1fr auto;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      will-change: transform, opacity;
+    }
+
+    .log-ts {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: rgba(148, 163, 184, 0.65);
+    }
+
+    .log-tag {
+      height: 16px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 0.03em;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .log-tag.fast {
+      background: rgba(47, 224, 208, 0.15);
+      color: var(--cyan-bright);
+      border: 1px solid rgba(47, 224, 208, 0.32);
+    }
+
+    .log-tag.deep {
+      background: rgba(245, 166, 35, 0.15);
+      color: var(--amber-bright);
+      border: 1px solid rgba(245, 166, 35, 0.32);
+    }
+
+    .log-msg {
+      color: rgba(226, 232, 240, 0.9);
+      white-space: nowrap;
+      font-size: 10px;
+    }
+
+    .log-dur {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      color: rgba(203, 213, 225, 0.78);
+      text-align: right;
+    }
+
+    /* Flash Highlight States */
+    .card-flash-cyan {
+      box-shadow:
+        0 14px 32px rgba(0, 0, 0, 0.6),
+        0 0 26px rgba(47, 224, 208, 0.4),
+        inset 0 1px 0 rgba(152, 250, 240, 0.68) !important;
+      border-color: rgba(47, 224, 208, 0.72) !important;
+    }
+
+    .card-flash-amber {
+      box-shadow:
+        0 14px 32px rgba(0, 0, 0, 0.6),
+        0 0 26px rgba(245, 166, 35, 0.4),
+        inset 0 1px 0 rgba(255, 212, 130, 0.68) !important;
+      border-color: rgba(245, 166, 35, 0.72) !important;
+    }
+
+    /* 4. Below Window: Keyword Capsules */
+    .pills-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      position: relative;
+      z-index: 6;
+      flex-shrink: 0;
+    }
+
+    .kw-pill {
+      flex: 1;
+      height: 34px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.095);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 4px 12px rgba(0, 0, 0, 0.36);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 12px;
+      color: rgba(241, 245, 249, 0.92);
+      white-space: nowrap;
+    }
+
+    .kw-pill .pill-dot-cyan {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 7px var(--cyan);
+    }
+
+    .kw-pill .pill-dot-amber {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 7px var(--amber);
+    }
+
+    .kw-pill .pill-dot-emerald {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #34D399;
+      box-shadow: 0 0 7px #34D399;
+    }
+
+    /* 5. 3-Cell Equal-Width Metrics Strip */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      position: relative;
+      z-index: 6;
+      flex-shrink: 0;
+    }
+
+    .metric-cell {
+      height: 92px;
+      padding: 12px 13px 11px;
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(18, 24, 36, 0.82) 0%, rgba(10, 14, 22, 0.9) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow:
+        0 8px 20px rgba(0, 0, 0, 0.44),
+        inset 0 1px 0 rgba(255, 255, 255, 0.095);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric-top-line {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+
+    .metric-val {
+      font-family: var(--font-mono);
+      font-size: 24px;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+    }
+
+    .metric-val.cyan {
+      color: var(--cyan-bright);
+      text-shadow: 0 0 14px rgba(47, 224, 208, 0.28);
+    }
+
+    .metric-val.amber {
+      color: var(--amber-bright);
+      text-shadow: 0 0 14px rgba(245, 166, 35, 0.25);
+    }
+
+    .metric-val.amber .cn-unit {
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      margin-left: 3px;
+      color: rgba(255, 212, 130, 0.9);
+    }
+
+    .metric-val.silver {
+      background: linear-gradient(180deg, #FFFFFF 0%, #99F6E4 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .metric-tag {
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 0.08em;
+      color: rgba(148, 163, 184, 0.5);
+    }
+
+    .metric-label {
+      font-size: 11.5px;
+      color: rgba(203, 213, 225, 0.72);
+    }
+
+    .metric-microbar {
+      width: 100%;
+      height: 3px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+      display: flex;
+      gap: 2px;
+    }
+
+    .metric-microbar-fill-cyan {
+      width: 28%;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--cyan), var(--cyan-bright));
+      box-shadow: 0 0 8px rgba(47, 224, 208, 0.6);
+    }
+
+    .metric-step-seg {
+      flex: 1;
+      height: 100%;
+      border-radius: 2px;
+      background: rgba(245, 166, 35, 0.78);
+    }
+
+    .metric-microbar-fill-saved {
+      width: 65%;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #10B981, #6EE7B7);
+    }
+
+    /* 6. Bottom blur(22px) Frosted Subtitle Capsule */
+    .subtitle-capsule {
+      min-height: 82px;
+      padding: 14px 22px;
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(22, 30, 45, 0.76) 0%, rgba(12, 16, 26, 0.88) 100%);
+      backdrop-filter: blur(22px) saturate(155%);
+      -webkit-backdrop-filter: blur(22px) saturate(155%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow:
+        0 16px 34px rgba(0, 0, 0, 0.62),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 6px;
+      position: relative;
+      z-index: 7;
+      flex-shrink: 0;
+    }
+
+    .subtitle-capsule::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 20%;
+      right: 20%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(47, 224, 208, 0.55), transparent);
+      pointer-events: none;
+    }
+
+    .sub-line {
+      font-size: 15.5px;
+      line-height: 1.5;
+      color: rgba(248, 250, 252, 0.95);
+      letter-spacing: 0.02em;
+    }
+
+    .hl-word {
+      color: var(--cyan-bright);
+      position: relative;
+      display: inline-block;
+      padding-bottom: 2px;
+    }
+
+    .hl-word::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 2px;
+      border-radius: 2px;
+      background: linear-gradient(90deg, rgba(47, 224, 208, 0.95), rgba(152, 250, 240, 0.88));
+      box-shadow: 0 0 8px rgba(47, 224, 208, 0.65);
+    }
+
+    /* ==========================================================
+       RIGHT SIDE: INTERACTIVE CONTROL PANEL
+       ========================================================== */
+    .control-dock {
+      width: 332px;
+      border-radius: 24px;
+      padding: 22px;
+      background: linear-gradient(180deg, rgba(16, 21, 31, 0.92) 0%, rgba(9, 12, 19, 0.96) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.085);
+      box-shadow:
+        0 28px 60px rgba(0, 0, 0, 0.78),
+        inset 0 1px 0 rgba(255, 255, 255, 0.11);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      flex-shrink: 0;
+    }
+
+    .dock-header {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.065);
+    }
+
+    .dock-badge-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .dock-kicker {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      color: var(--cyan);
+    }
+
+    .dock-mode-pill {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      background: rgba(47, 224, 208, 0.12);
+      border: 1px solid rgba(47, 224, 208, 0.28);
+      color: var(--cyan-bright);
+    }
+
+    .dock-title {
+      font-size: 17px;
+      color: #F8FAFC;
+    }
+
+    .dock-desc {
+      font-size: 12px;
+      line-height: 1.55;
+      color: rgba(148, 163, 184, 0.78);
+    }
+
+    .dock-section {
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+
+    .dock-sec-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: rgba(226, 232, 240, 0.88);
+    }
+
+    .time-readout {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--cyan-bright);
+    }
+
+    .scrubber-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .timeline-range {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.09);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .timeline-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      border: 2px solid var(--cyan);
+      box-shadow: 0 0 12px rgba(47, 224, 208, 0.85);
+      cursor: grab;
+    }
+
+    .scrubber-ticks {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      color: rgba(148, 163, 184, 0.5);
+    }
+
+    .transport-row {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 8px;
+    }
+
+    .dock-btn {
+      height: 38px;
+      padding: 0 12px;
+      border-radius: 11px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.025) 100%);
+      color: #F1F5F9;
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .dock-btn:hover {
+      border-color: rgba(255, 255, 255, 0.22);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.04) 100%);
+    }
+
+    .dock-btn:active {
+      transform: scale(0.97);
+    }
+
+    .dock-btn.primary {
+      background: linear-gradient(180deg, rgba(47, 224, 208, 0.24) 0%, rgba(47, 224, 208, 0.09) 100%);
+      border-color: rgba(47, 224, 208, 0.42);
+      color: var(--cyan-bright);
+    }
+
+    .cue-chips {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .cue-chip {
+      height: 28px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.075);
+      background: rgba(255, 255, 255, 0.025);
+      color: rgba(203, 213, 225, 0.78);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+
+    .cue-chip:hover {
+      border-color: rgba(47, 224, 208, 0.35);
+      color: var(--cyan-bright);
+      background: rgba(47, 224, 208, 0.08);
+    }
+
+    .sim-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .sim-btn {
+      height: 44px;
+      padding: 0 14px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      cursor: pointer;
+      transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+
+    .sim-btn:active {
+      transform: scale(0.975);
+    }
+
+    .sim-btn.fast-sim {
+      background: linear-gradient(90deg, rgba(47, 224, 208, 0.16) 0%, rgba(47, 224, 208, 0.05) 100%);
+      border: 1px solid rgba(47, 224, 208, 0.34);
+      color: #E2FFFC;
+    }
+
+    .sim-btn.fast-sim:hover {
+      border-color: rgba(47, 224, 208, 0.65);
+      box-shadow: 0 0 20px rgba(47, 224, 208, 0.18);
+    }
+
+    .sim-btn.deep-sim {
+      background: linear-gradient(90deg, rgba(245, 166, 35, 0.16) 0%, rgba(245, 166, 35, 0.05) 100%);
+      border: 1px solid rgba(245, 166, 35, 0.34);
+      color: #FFF4E0;
+    }
+
+    .sim-btn.deep-sim:hover {
+      border-color: rgba(245, 166, 35, 0.65);
+      box-shadow: 0 0 20px rgba(245, 166, 35, 0.18);
+    }
+
+    .sim-meta {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      opacity: 0.85;
+    }
+
+    .dock-hint {
+      padding: 10px 12px;
+      border-radius: 11px;
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 11.5px;
+      line-height: 1.55;
+      color: rgba(148, 163, 184, 0.75);
+    }
+
+    @media (max-width: 940px) {
+      .studio-shell {
+        flex-direction: column;
+        padding: 16px;
+      }
+      .control-dock {
+        width: 540px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="studio-shell">
+    <!-- 9:16 Hardware Card Stage -->
+    <div class="frame-bezel">
+      <main class="phone-stage" id="phoneStage">
+        <div class="noise-layer"></div>
+
+        <!-- 1. Top 6-Item Lightweight Navigation -->
+        <nav class="top-nav" aria-label="章节导航">
+          <div class="nav-item"><span class="nav-idx">01</span><span>舆情</span></div>
+          <div class="nav-item active"><span class="nav-idx">02</span><span>路由</span></div>
+          <div class="nav-item"><span class="nav-idx">03</span><span>遥控</span></div>
+          <div class="nav-item"><span class="nav-idx">04</span><span>架构</span></div>
+          <div class="nav-item"><span class="nav-idx">05</span><span>整理</span></div>
+          <div class="nav-item"><span class="nav-idx">06</span><span>记忆</span></div>
+        </nav>
+
+        <!-- 2. Metallic Gradient Title & Subtitle -->
+        <header class="hero-header" id="heroHeader">
+          <div class="eyebrow-row">
+            <span class="eyebrow-tag"><span class="eyebrow-dot"></span>D02 · SMART ROUTING ENGINE</span>
+            <span class="eyebrow-meta">RAYCAST × DUAL-TRACK</span>
+          </div>
+          <h1 class="hero-title">一键自动路由，<span class="accent-metal">快慢不串台</span></h1>
+          <p class="hero-subtitle">
+            <span>按下</span>
+            <span class="inline-kbd">⌘K</span>
+            <span class="sub-arrow">→</span>
+            <span>意图识别分流</span>
+            <span class="sub-arrow">→</span>
+            <span>轻任务秒回，重任务深推</span>
+          </p>
+        </header>
+
+        <!-- 3. Central 504x452 Deep-Space Glass Showcase Window -->
+        <section class="showcase-window" id="showcaseWindow">
+          <div class="showcase-grid"></div>
+
+          <!-- Background Conduit Grooves & Active Fiber Beams -->
+          <svg class="fiber-svg-bg" viewBox="0 0 504 452" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="gradInput" x1="124" y1="183" x2="152" y2="191" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#98FAF0" />
+                <stop offset="100%" stop-color="#2FE0D0" />
+              </linearGradient>
+              <linearGradient id="gradFast" x1="244" y1="182" x2="314" y2="184" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#2FE0D0" />
+                <stop offset="100%" stop-color="#98FAF0" />
+              </linearGradient>
+              <linearGradient id="gradDeep" x1="244" y1="202" x2="314" y2="352" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#2FE0D0" stop-opacity="0.85" />
+                <stop offset="30%" stop-color="#F5A623" />
+                <stop offset="100%" stop-color="#FFD482" />
+              </linearGradient>
+              <filter id="glowCyan" x="-60%" y="-60%" width="220%" height="220%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <filter id="glowAmber" x="-60%" y="-60%" width="220%" height="220%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            <!-- Machined Conduit Grooves -->
+            <path d="M 124 183 C 138 183, 140 191, 152 191" stroke="rgba(255,255,255,0.075)" stroke-width="4" stroke-linecap="round" />
+            <path d="M 244 182 C 276 182, 280 184, 314 184" stroke="rgba(255,255,255,0.07)" stroke-width="4" stroke-linecap="round" />
+            <path d="M 244 202 C 292 202, 286 352, 314 352" stroke="rgba(255,255,255,0.07)" stroke-width="4" stroke-linecap="round" />
+            <!-- Subtle Telemetry Link from Router to routing.log -->
+            <path d="M 198 268 L 198 288" stroke="rgba(47,224,208,0.22)" stroke-width="1.2" stroke-dasharray="2 2.5" />
+
+            <!-- Active Glowing Fiber Beams -->
+            <path id="beamInput" d="M 124 183 C 138 183, 140 191, 152 191" stroke="url(#gradInput)" stroke-width="2.2" stroke-linecap="round" filter="url(#glowCyan)" />
+            <path id="beamFast" d="M 244 182 C 276 182, 280 184, 314 184" stroke="url(#gradFast)" stroke-width="2.2" stroke-linecap="round" filter="url(#glowCyan)" />
+            <path id="beamDeep" d="M 244 202 C 292 202, 286 352, 314 352" stroke="url(#gradDeep)" stroke-width="2.2" stroke-linecap="round" filter="url(#glowAmber)" />
+          </svg>
+
+          <!-- Foreground Port Terminals & Flowing Photon Particles (Unoccluded) -->
+          <svg class="fiber-svg-fg" viewBox="0 0 504 452" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="fgGlowCyan" x="-80%" y="-80%" width="260%" height="260%">
+                <feGaussianBlur stdDeviation="2.8" result="b" />
+                <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+              <filter id="fgGlowAmber" x="-80%" y="-80%" width="260%" height="260%">
+                <feGaussianBlur stdDeviation="2.8" result="b" />
+                <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+            </defs>
+            <!-- Precision Port Pads -->
+            <circle cx="124" cy="183" r="2.8" fill="#0B111C" stroke="#2FE0D0" stroke-width="1.4" />
+            <circle cx="152" cy="191" r="2.8" fill="#0B111C" stroke="#2FE0D0" stroke-width="1.4" />
+            <circle cx="244" cy="182" r="2.8" fill="#0B111C" stroke="#2FE0D0" stroke-width="1.4" />
+            <circle cx="314" cy="184" r="3.2" fill="#0B111C" stroke="#98FAF0" stroke-width="1.5" />
+            <circle cx="244" cy="202" r="2.8" fill="#0B111C" stroke="#F5A623" stroke-width="1.4" />
+            <circle cx="314" cy="352" r="3.2" fill="#0B111C" stroke="#FFD482" stroke-width="1.5" />
+
+            <!-- Flowing Photons -->
+            <circle id="photonIn" cx="138" cy="187" r="2.8" fill="#FFFFFF" filter="url(#fgGlowCyan)" opacity="0" />
+            <circle id="photonFast1" cx="278" cy="183" r="3.1" fill="#ECFFFD" filter="url(#fgGlowCyan)" opacity="0" />
+            <circle id="photonFast2" cx="262" cy="182" r="2.1" fill="#2FE0D0" filter="url(#fgGlowCyan)" opacity="0" />
+            <circle id="photonDeep1" cx="290" cy="282" r="3.2" fill="#FFF5DC" filter="url(#fgGlowAmber)" opacity="0" />
+            <circle id="photonDeep2" cx="278" cy="226" r="2.2" fill="#F5A623" filter="url(#fgGlowAmber)" opacity="0" />
+          </svg>
+
+          <!-- A. Top Raycast-Style Dark Command Bar -->
+          <div class="raycast-bar" id="raycastBar">
+            <div class="rc-input-row">
+              <div class="rc-prompt-wrap">
+                <svg class="rc-search-icon" viewBox="0 0 16 16" fill="none">
+                  <circle cx="7" cy="7" r="4.8" stroke="currentColor" stroke-width="1.5" />
+                  <path d="M10.6 10.6L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+                <div class="rc-query-text">
+                  <span id="rcQuerySpan">重构支付模块，顺便补测试</span><span class="rc-caret" id="rcCaret"></span>
+                </div>
+              </div>
+              <div class="rc-shortcut-group">
+                <span class="rc-badge-kbd">⌘ K</span>
+                <span class="rc-badge-esc">ESC</span>
+              </div>
+            </div>
+            <div class="rc-candidates">
+              <div class="rc-item selected" id="rcCand1">
+                <div class="rc-item-left">
+                  <span class="rc-item-dot">⚡</span>
+                  <span id="rcCand1Text">Auto Route · 智能混合意图分流</span>
+                </div>
+                <div class="rc-item-right">
+                  <span class="rc-pill-cyan" id="rcRoutePill1">FAST</span>
+                  <span class="rc-pill-amber" id="rcRoutePill2">DEEP</span>
+                  <span style="color: rgba(226,232,240,0.65)">↵</span>
+                </div>
+              </div>
+              <div class="rc-item secondary" id="rcCand2">
+                <div class="rc-item-left">
+                  <span class="rc-item-dot">⌘</span>
+                  <span>Direct Model · 单一重模型全量串行处理</span>
+                </div>
+                <div class="rc-item-right">
+                  <span class="rc-pill-muted">慢 3.2x · 高消耗</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- B. Left 3D Mechanical Dual Keycaps (⌘ K) -->
+          <div class="keycap-unit" id="keycapUnit" title="点击触发 ⌘K 智能路由分流">
+            <div class="keywell-chassis">
+              <div class="keywell-led" id="keywellLed"></div>
+              <div class="mech-key" id="keyCmd">
+                <div class="mech-key-top">
+                  <span class="key-sub-legend">CMD</span>
+                  <span class="key-main-legend">⌘</span>
+                </div>
+              </div>
+              <div class="mech-key" id="keyK">
+                <div class="mech-key-top">
+                  <span class="key-sub-legend">KEY</span>
+                  <span class="key-main-legend">K</span>
+                </div>
+              </div>
+            </div>
+            <div class="keycap-caption">
+              <span class="keycap-caption-dot"></span>
+              <span>点击键帽实测</span>
+            </div>
+          </div>
+
+          <!-- C. Central Precision Router Core -->
+          <div class="router-module" id="routerModule">
+            <div class="router-dial">
+              <svg class="router-svg" viewBox="0 0 92 92">
+                <defs>
+                  <linearGradient id="arcCyanGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#2FE0D0" stop-opacity="0.06" />
+                    <stop offset="60%" stop-color="#2FE0D0" stop-opacity="0.92" />
+                    <stop offset="100%" stop-color="#A6FCF3" stop-opacity="1" />
+                  </linearGradient>
+                  <linearGradient id="arcAmberGrad" x1="100%" y1="100%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#F5A623" stop-opacity="0.06" />
+                    <stop offset="60%" stop-color="#F5A623" stop-opacity="0.92" />
+                    <stop offset="100%" stop-color="#FFE2A4" stop-opacity="1" />
+                  </linearGradient>
+                </defs>
+                <g id="routerTicks" transform="translate(46,46)"></g>
+                <circle cx="46" cy="46" r="32.5" stroke="rgba(255,255,255,0.075)" stroke-width="2.5" fill="none" />
+                <g id="routerArcs" style="transform-origin: 46px 46px;">
+                  <path d="M 17.8 29.8 A 32.5 32.5 0 0 1 74.2 29.8" stroke="url(#arcCyanGrad)" stroke-width="2.8" stroke-linecap="round" fill="none" />
+                  <path d="M 74.2 62.2 A 32.5 32.5 0 0 1 17.8 62.2" stroke="url(#arcAmberGrad)" stroke-width="2.8" stroke-linecap="round" fill="none" />
+                </g>
+                <g id="routerInnerRing" style="transform-origin: 46px 46px;">
+                  <circle cx="46" cy="46" r="26" stroke="rgba(152,250,240,0.24)" stroke-width="1" stroke-dasharray="5 4" fill="none" />
+                </g>
+              </svg>
+              <div class="router-core-cap">
+                <svg class="router-prism-icon" viewBox="0 0 16 16" fill="none">
+                  <path d="M2.5 8H7.2M7.2 8L12.8 4M7.2 8L12.8 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                  <circle cx="13.2" cy="4" r="1.3" fill="#2FE0D0" />
+                  <circle cx="13.2" cy="12" r="1.3" fill="#F5A623" />
+                </svg>
+                <span class="router-core-label">ROUTER</span>
+              </div>
+            </div>
+            <div class="router-readout">
+              <span>意图识别 · 置信度</span>
+              <span class="router-conf-num" id="routerConfVal">0.97</span>
+            </div>
+          </div>
+
+          <!-- D. Top-Right FAST Light Model Card -->
+          <div class="fast-card" id="fastCard">
+            <div class="card-head">
+              <div class="badge-fast">
+                <span class="badge-fast-code">FAST</span>
+                <span>极速轻模型</span>
+              </div>
+              <div class="icon-well-cyan">
+                <svg id="paperPlaneIcon" width="15" height="15" viewBox="0 0 16 16" fill="none">
+                  <path d="M14.2 2.2L1.8 7.3L6.6 9.2L12.2 4.2L8.3 10.1L10.4 14.1L14.2 2.2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" fill="rgba(47,224,208,0.16)" />
+                </svg>
+              </div>
+            </div>
+
+            <div class="fast-metric-row">
+              <span class="fast-big-num" id="fastTimeVal">0.4s</span>
+              <span class="fast-unit-note">秒级首字响应</span>
+            </div>
+
+            <div class="latency-block">
+              <div class="latency-meta">
+                <span>LATENCY STREAM</span>
+                <span id="fastTpsVal">198 tok/s</span>
+              </div>
+              <div class="latency-bars" id="latencyBars">
+                <div class="lat-bar" style="height: 45%"></div>
+                <div class="lat-bar" style="height: 78%"></div>
+                <div class="lat-bar" style="height: 96%"></div>
+                <div class="lat-bar" style="height: 68%"></div>
+                <div class="lat-bar" style="height: 52%"></div>
+                <div class="lat-bar" style="height: 40%"></div>
+                <div class="lat-bar" style="height: 48%"></div>
+                <div class="lat-bar" style="height: 36%"></div>
+                <div class="lat-bar" style="height: 44%"></div>
+                <div class="lat-bar" style="height: 34%"></div>
+                <div class="lat-bar" style="height: 42%"></div>
+                <div class="lat-bar" style="height: 32%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- E. Bottom-Right DEEP Reasoning Chain Card -->
+          <div class="deep-card" id="deepCard">
+            <div class="card-head">
+              <div class="badge-deep">
+                <span class="badge-fast-code">DEEP</span>
+                <span>深度推理链</span>
+              </div>
+              <div class="icon-well-amber">
+                <svg id="deepGearSvg" width="16" height="16" viewBox="0 0 20 20" fill="none" style="will-change: transform;">
+                  <path d="M10 6.7a3.3 3.3 0 1 0 0 6.6 3.3 3.3 0 0 0 0-6.6Zm7.4 2.4-.9-.3a6.1 6.1 0 0 0-.5-1.2l.5-.8a.7.7 0 0 0-.1-.9l-.8-.8a.7.7 0 0 0-.9-.1l-.8.5c-.4-.2-.8-.4-1.2-.5l-.3-.9A.7.7 0 0 0 11.7 3h-1.4a.7.7 0 0 0-.7.5l-.3.9c-.4.1-.8.3-1.2.5l-.8-.5a.7.7 0 0 0-.9.1l-.8.8a.7.7 0 0 0-.1.9l.5.8c-.2.4-.4.8-.5 1.2l-.9.3a.7.7 0 0 0-.5.7v1.4c0 .3.2.6.5.7l.9.3c.1.4.3.8.5 1.2l-.5.8a.7.7 0 0 0 .1.9l.8.8c.2.2.6.3.9.1l.8-.5c.4.2.8.4 1.2.5l.3.9c.1.3.4.5.7.5h1.4c.3 0 .6-.2.7-.5l.3-.9c.4-.1.8-.3 1.2-.5l.8.5c.3.2.7.1.9-.1l.8-.8a.7.7 0 0 0 .1-.9l-.5-.8c.2-.4.4-.8.5-1.2l.9-.3a.7.7 0 0 0 .5-.7V9.8a.7.7 0 0 0-.6-.7Z" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" fill="rgba(245,166,35,0.15)" />
+                </svg>
+              </div>
+            </div>
+
+            <div class="deep-steps">
+              <div class="deep-step done" id="deepStep1">
+                <div class="step-left">
+                  <span class="step-check">
+                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2.2 6.3L4.8 8.9L9.8 3.3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </span>
+                  <span>拆解任务</span>
+                </div>
+                <span class="step-time">1.2s</span>
+              </div>
+              <div class="deep-step done" id="deepStep2">
+                <div class="step-left">
+                  <span class="step-check">
+                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2.2 6.3L4.8 8.9L9.8 3.3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </span>
+                  <span>多步推理</span>
+                </div>
+                <span class="step-time">3.8s</span>
+              </div>
+              <div class="deep-step done" id="deepStep3">
+                <div class="step-left">
+                  <span class="step-check">
+                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2.2 6.3L4.8 8.9L9.8 3.3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </span>
+                  <span>自检校验</span>
+                </div>
+                <span class="step-pass-tag">已通过</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- F. Bottom-Left routing.log Live Micro-Terminal -->
+          <div class="terminal-card" id="terminalCard">
+            <div class="term-header">
+              <div class="term-title-wrap">
+                <span class="term-prompt-sym">&gt;_</span>
+                <span>routing.log</span>
+              </div>
+              <div class="live-pill">
+                <span class="live-dot" id="liveDot"></span>
+                <span>LIVE</span>
+              </div>
+            </div>
+            <div class="term-body" id="termBody">
+              <div class="log-row" id="logRow1">
+                <span class="log-ts">14:02:11</span>
+                <span class="log-tag fast">FAST</span>
+                <span class="log-msg">生成单测断言骨架</span>
+                <span class="log-dur">0.4s</span>
+              </div>
+              <div class="log-row" id="logRow2">
+                <span class="log-ts">14:02:12</span>
+                <span class="log-tag deep">DEEP</span>
+                <span class="log-msg">重构支付核心逻辑</span>
+                <span class="log-dur">5.0s</span>
+              </div>
+              <div class="log-row" id="logRow3">
+                <span class="log-ts">14:02:16</span>
+                <span class="log-tag fast">FAST</span>
+                <span class="log-msg">双轨汇总·省65%算力</span>
+                <span class="log-dur">0.2s</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. Keyword Capsules Below Window -->
+        <div class="pills-strip" id="pillsStrip">
+          <div class="kw-pill"><span class="pill-dot-cyan"></span><span>⌘K 零配置</span></div>
+          <div class="kw-pill"><span class="pill-dot-amber"></span><span>双轨智能路由</span></div>
+          <div class="kw-pill"><span class="pill-dot-emerald"></span><span>省 65% Token</span></div>
+        </div>
+
+        <!-- 5. 3-Cell Equal-Width Metrics Strip -->
+        <div class="metrics-grid" id="metricsGrid">
+          <div class="metric-cell">
+            <div class="metric-top-line">
+              <span class="metric-val cyan">0.4s</span>
+              <span class="metric-tag">FAST</span>
+            </div>
+            <div class="metric-label">轻任务响应</div>
+            <div class="metric-microbar"><div class="metric-microbar-fill-cyan"></div></div>
+          </div>
+          <div class="metric-cell">
+            <div class="metric-top-line">
+              <span class="metric-val amber">6<span class="cn-unit">步</span></span>
+              <span class="metric-tag">DEEP</span>
+            </div>
+            <div class="metric-label">重任务深度推理</div>
+            <div class="metric-microbar">
+              <span class="metric-step-seg"></span>
+              <span class="metric-step-seg"></span>
+              <span class="metric-step-seg"></span>
+              <span class="metric-step-seg"></span>
+              <span class="metric-step-seg"></span>
+              <span class="metric-step-seg"></span>
+            </div>
+          </div>
+          <div class="metric-cell">
+            <div class="metric-top-line">
+              <span class="metric-val silver">-65%</span>
+              <span class="metric-tag">SAVED</span>
+            </div>
+            <div class="metric-label">无效算力消耗</div>
+            <div class="metric-microbar"><div class="metric-microbar-fill-saved"></div></div>
+          </div>
+        </div>
+
+        <!-- 6. Bottom blur(22px) Frosted Subtitle Capsule -->
+        <footer class="subtitle-capsule" id="subtitleCapsule">
+          <div class="sub-line">按一次<span class="hl-word">快捷键</span>，路由核自动把</div>
+          <div class="sub-line"><span class="hl-word">轻重任务分轨跑</span>，<span class="hl-word">又快又省钱</span></div>
+        </footer>
+      </main>
+    </div>
+
+    <!-- Right-Side Interactive Control Panel -->
+    <aside class="control-dock" id="controlDock">
+      <div class="dock-header">
+        <div class="dock-badge-row">
+          <span class="dock-kicker">CARBON D02 STUDIO</span>
+          <span class="dock-mode-pill" id="modeBadge">TIMELINE · 4.5s</span>
+        </div>
+        <h2 class="dock-title">智能道岔分流 · 交互控制台</h2>
+        <p class="dock-desc">前 3.1s 从 ⌘K 击发逐级生长出双轨卡片与日志，后 1.4s 完整态光子流淌与齿轮微动；随时可真实点击实测。</p>
+      </div>
+
+      <div class="dock-section">
+        <div class="dock-sec-title">
+          <span>视频时间轴 (window.seek)</span>
+          <span class="time-readout" id="timeReadout">3.72s / 4.50s</span>
+        </div>
+        <div class="scrubber-wrap">
+          <input type="range" class="timeline-range" id="timelineSlider" min="0" max="4.5" step="0.01" value="3.72" />
+          <div class="scrubber-ticks">
+            <span>0.0s</span>
+            <span>0.8s ⌘K</span>
+            <span>1.7s 分流</span>
+            <span>3.1s 完整</span>
+            <span>4.5s</span>
+          </div>
+        </div>
+        <div class="transport-row">
+          <button type="button" class="dock-btn primary" id="playPauseBtn">▶ 播放完整生长</button>
+          <button type="button" class="dock-btn" id="replayBtn">↺ 从 0.0s 重播</button>
+        </div>
+        <div class="cue-chips">
+          <button type="button" class="cue-chip" data-seek="0.72">0.7s 键帽下沉</button>
+          <button type="button" class="cue-chip" data-seek="1.65">1.7s 光纤分流</button>
+          <button type="button" class="cue-chip" data-seek="3.72">3.7s 完整定格</button>
+        </div>
+      </div>
+
+      <div class="dock-section">
+        <div class="dock-sec-title">
+          <span>真实点击分流实测</span>
+          <span style="font-family: var(--font-mono); font-size: 10.5px; color: rgba(148,163,184,0.65);">支持按键盘 ⌘K</span>
+        </div>
+        <div class="sim-stack">
+          <button type="button" class="sim-btn fast-sim" id="simFastBtn">
+            <span>⚡ 模拟轻任务</span>
+            <span class="sim-meta">FAST · 0.4s 秒回</span>
+          </button>
+          <button type="button" class="sim-btn deep-sim" id="simDeepBtn">
+            <span>🧠 模拟重任务</span>
+            <span class="sim-meta">DEEP · 多步深推</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="dock-hint">
+        提示：直接点击左侧画布中的立体 <span style="color: var(--cyan-bright);">⌘ K 机械键帽</span>，同样会触发键帽物理下沉、青色轴体背光爆发、双轨道岔脉冲与实时日志追加。
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const params = new URLSearchParams(window.location.search);
+      const isShotMode = params.get('shot') === '1';
+      if (isShotMode) {
+        document.body.classList.add('shot-mode');
+      }
+
+      const DURATION = 4.5;
+      const DEFAULT_SHOT_TIME = 3.72;
+      const BASE_PROMPT = '重构支付模块，顺便补测试';
+
+      // Build 60 precision radial tick marks inside Router SVG
+      const ticksGroup = document.getElementById('routerTicks');
+      if (ticksGroup) {
+        const frag = document.createDocumentFragment();
+        const svgNS = 'http://www.w3.org/2000/svg';
+        for (let i = 0; i < 60; i++) {
+          const angle = (i * 6 * Math.PI) / 180;
+          const isMajor = i % 5 === 0;
+          const rOuter = 41.8;
+          const rInner = isMajor ? 37.0 : 39.2;
+          const line = document.createElementNS(svgNS, 'line');
+          line.setAttribute('x1', (Math.cos(angle) * rInner).toFixed(2));
+          line.setAttribute('y1', (Math.sin(angle) * rInner).toFixed(2));
+          line.setAttribute('x2', (Math.cos(angle) * rOuter).toFixed(2));
+          line.setAttribute('y2', (Math.sin(angle) * rOuter).toFixed(2));
+          line.setAttribute(
+            'stroke',
+            isMajor ? 'rgba(152, 250, 240, 0.5)' : 'rgba(148, 163, 184, 0.22)'
+          );
+          line.setAttribute('stroke-width', isMajor ? '1.15' : '0.75');
+          line.setAttribute('stroke-linecap', 'round');
+          frag.appendChild(line);
+        }
+        ticksGroup.appendChild(frag);
+      }
+
+      const els = {
+        raycastBar: document.getElementById('raycastBar'),
+        rcQuerySpan: document.getElementById('rcQuerySpan'),
+        rcCaret: document.getElementById('rcCaret'),
+        rcCand1: document.getElementById('rcCand1'),
+        rcCand1Text: document.getElementById('rcCand1Text'),
+        rcRoutePill1: document.getElementById('rcRoutePill1'),
+        rcRoutePill2: document.getElementById('rcRoutePill2'),
+        rcCand2: document.getElementById('rcCand2'),
+        keycapUnit: document.getElementById('keycapUnit'),
+        keyCmd: document.getElementById('keyCmd'),
+        keyK: document.getElementById('keyK'),
+        keywellLed: document.getElementById('keywellLed'),
+        routerModule: document.getElementById('routerModule'),
+        routerArcs: document.getElementById('routerArcs'),
+        routerInnerRing: document.getElementById('routerInnerRing'),
+        routerConfVal: document.getElementById('routerConfVal'),
+        fastCard: document.getElementById('fastCard'),
+        paperPlaneIcon: document.getElementById('paperPlaneIcon'),
+        fastTimeVal: document.getElementById('fastTimeVal'),
+        fastTpsVal: document.getElementById('fastTpsVal'),
+        latencyBars: Array.from(document.querySelectorAll('#latencyBars .lat-bar')),
+        deepCard: document.getElementById('deepCard'),
+        deepGearSvg: document.getElementById('deepGearSvg'),
+        deepSteps: [
+          document.getElementById('deepStep1'),
+          document.getElementById('deepStep2'),
+          document.getElementById('deepStep3')
+        ],
+        terminalCard: document.getElementById('terminalCard'),
+        termBody: document.getElementById('termBody'),
+        liveDot: document.getElementById('liveDot'),
+        pillsStrip: document.getElementById('pillsStrip'),
+        metricsGrid: document.getElementById('metricsGrid'),
+        subtitleCapsule: document.getElementById('subtitleCapsule'),
+        beamInput: document.getElementById('beamInput'),
+        beamFast: document.getElementById('beamFast'),
+        beamDeep: document.getElementById('beamDeep'),
+        photonIn: document.getElementById('photonIn'),
+        photonFast1: document.getElementById('photonFast1'),
+        photonFast2: document.getElementById('photonFast2'),
+        photonDeep1: document.getElementById('photonDeep1'),
+        photonDeep2: document.getElementById('photonDeep2'),
+        timelineSlider: document.getElementById('timelineSlider'),
+        timeReadout: document.getElementById('timeReadout'),
+        playPauseBtn: document.getElementById('playPauseBtn'),
+        replayBtn: document.getElementById('replayBtn'),
+        modeBadge: document.getElementById('modeBadge'),
+        simFastBtn: document.getElementById('simFastBtn'),
+        simDeepBtn: document.getElementById('simDeepBtn')
+      };
+
+      const pathLengths = {
+        input: els.beamInput.getTotalLength(),
+        fast: els.beamFast.getTotalLength(),
+        deep: els.beamDeep.getTotalLength()
+      };
+
+      els.beamInput.style.strokeDasharray = String(pathLengths.input);
+      els.beamFast.style.strokeDasharray = String(pathLengths.fast);
+      els.beamDeep.style.strokeDasharray = String(pathLengths.deep);
+
+      const baseBarHeights = [0.45, 0.78, 0.96, 0.68, 0.52, 0.40, 0.48, 0.36, 0.44, 0.34, 0.42, 0.32];
+
+      function clamp(v, min, max) {
+        return Math.max(min, Math.min(max, v));
+      }
+
+      function progress(t, start, end) {
+        if (end <= start) return t >= end ? 1 : 0;
+        return clamp((t - start) / (end - start), 0, 1);
+      }
+
+      function easeOutCubic(x) {
+        return 1 - Math.pow(1 - x, 3);
+      }
+
+      function easeOutBack(x) {
+        const c1 = 1.70158;
+        const c3 = c1 + 1;
+        return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+      }
+
+      function setEnterStyle(el, p, yOffset) {
+        const e = easeOutCubic(p);
+        el.style.opacity = e.toFixed(3);
+        el.style.transform = `translate3d(0, ${((1 - e) * yOffset).toFixed(2)}px, 0)`;
+      }
+
+      function placePhotonOnPath(circleEl, pathEl, totalLen, u, visible) {
+        if (!visible || u <= 0.02 || u >= 0.98) {
+          circleEl.setAttribute('opacity', '0');
+          return;
+        }
+        const pt = pathEl.getPointAtLength(u * totalLen);
+        circleEl.setAttribute('cx', pt.x.toFixed(2));
+        circleEl.setAttribute('cy', pt.y.toFixed(2));
+        const edgeFade = Math.min(u * 4.5, (1 - u) * 4.5, 1);
+        circleEl.setAttribute('opacity', (0.96 * edgeFade).toFixed(3));
+      }
+
+      let currentTime = DEFAULT_SHOT_TIME;
+      let isPlaying = false;
+      let rafId = null;
+      let lastFrameTs = 0;
+      let liveModeActive = false;
+
+      function renderAtTime(rawT) {
+        const t = clamp(Number(rawT) || 0, 0, DURATION);
+        currentTime = t;
+
+        if (els.timelineSlider) {
+          els.timelineSlider.value = t.toFixed(2);
+        }
+        if (els.timeReadout) {
+          els.timeReadout.textContent = `${t.toFixed(2)}s / ${DURATION.toFixed(2)}s`;
+        }
+
+        // 1. Raycast Command Bar (0.00s -> 0.50s)
+        const pBar = progress(t, 0.0, 0.36);
+        setEnterStyle(els.raycastBar, pBar, -10);
+
+        if (!liveModeActive) {
+          const typeP = progress(t, 0.08, 0.58);
+          const charCount = Math.max(1, Math.round(typeP * BASE_PROMPT.length));
+          els.rcQuerySpan.textContent = BASE_PROMPT.slice(0, charCount);
+        }
+        const caretBlink = t < 0.65 ? 1 : (Math.sin(t * 9.5) > -0.2 ? 1 : 0.2);
+        els.rcCaret.style.opacity = caretBlink.toFixed(2);
+
+        const pCand1 = easeOutCubic(progress(t, 0.24, 0.54));
+        els.rcCand1.style.opacity = pCand1.toFixed(3);
+        els.rcCand1.style.transform = `translate3d(${((1 - pCand1) * -8).toFixed(2)}px, 0, 0)`;
+
+        const pCand2 = easeOutCubic(progress(t, 0.34, 0.64));
+        els.rcCand2.style.opacity = pCand2.toFixed(3);
+        els.rcCand2.style.transform = `translate3d(${((1 - pCand2) * -8).toFixed(2)}px, 0, 0)`;
+
+        // 2. 3D Mechanical Dual Keycaps
+        const pKeyAppear = progress(t, 0.28, 0.58);
+        setEnterStyle(els.keycapUnit, pKeyAppear, 12);
+
+        let pressAmt = 0;
+        if (t >= 0.54 && t <= 0.96) {
+          const u = (t - 0.54) / 0.42;
+          pressAmt = Math.sin(u * Math.PI);
+        }
+        const yDepress = (pressAmt * 3.8).toFixed(2);
+        const skirtShadow = (5 - pressAmt * 3.5).toFixed(2);
+        const keyGlow = (0.14 + pressAmt * 0.36).toFixed(3);
+
+        [els.keyCmd, els.keyK].forEach((kEl, idx) => {
+          const delayShift = idx === 1 ? 0.92 : 1;
+          kEl.style.transform = `translate3d(0, ${(yDepress * delayShift).toFixed(2)}px, 0)`;
+          kEl.style.boxShadow = `0 ${skirtShadow}px 0 #070A10, 0 7px 12px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.34), inset 0 -1px 0 rgba(47,224,208,0.4), 0 0 14px rgba(47,224,208,${keyGlow})`;
+        });
+        const baseLed = t >= 0.56 ? 0.62 : 0.2;
+        els.keywellLed.style.opacity = Math.min(0.98, baseLed + pressAmt * 0.36).toFixed(3);
+
+        // 3. Input Fiber Beam (0.66s -> 1.02s)
+        const pBeamIn = easeOutCubic(progress(t, 0.66, 1.02));
+        els.beamInput.style.strokeDashoffset = ((1 - pBeamIn) * pathLengths.input).toFixed(2);
+        els.beamInput.style.opacity = pBeamIn > 0.01 ? '1' : '0';
+
+        // 4. Central Precision Router Core (0.74s -> 1.25s)
+        const pRouter = easeOutBack(progress(t, 0.74, 1.18));
+        const pRouterFade = easeOutCubic(progress(t, 0.74, 1.08));
+        els.routerModule.style.opacity = pRouterFade.toFixed(3);
+        els.routerModule.style.transform = `scale(${(0.88 + 0.12 * clamp(pRouter, 0, 1.04)).toFixed(3)})`;
+
+        const rotDeg = t * 50;
+        els.routerArcs.style.transform = `rotate(${rotDeg.toFixed(1)}deg)`;
+        els.routerInnerRing.style.transform = `rotate(${(-rotDeg * 0.65).toFixed(1)}deg)`;
+
+        if (!liveModeActive) {
+          const confP = easeOutCubic(progress(t, 0.85, 1.42));
+          els.routerConfVal.textContent = (0.97 * confP).toFixed(2);
+        }
+
+        // 5. Bifurcation Fiber Beams (FAST & DEEP)
+        const pBeamFast = easeOutCubic(progress(t, 1.10, 1.50));
+        els.beamFast.style.strokeDashoffset = ((1 - pBeamFast) * pathLengths.fast).toFixed(2);
+        els.beamFast.style.opacity = pBeamFast > 0.01 ? '1' : '0';
+
+        const pBeamDeep = easeOutCubic(progress(t, 1.20, 1.68));
+        els.beamDeep.style.strokeDashoffset = ((1 - pBeamDeep) * pathLengths.deep).toFixed(2);
+        els.beamDeep.style.opacity = pBeamDeep > 0.01 ? '1' : '0';
+
+        // Flowing Photons
+        const uIn = t >= 0.72 ? ((t - 0.72) * 1.35 + 0.42) % 1 : 0;
+        placePhotonOnPath(els.photonIn, els.beamInput, pathLengths.input, uIn, t >= 0.72);
+
+        const uFast1 = t >= 1.18 ? ((t - 1.18) * 1.25 + 0.48) % 1 : 0;
+        const uFast2 = t >= 1.18 ? ((t - 1.18) * 1.25 + 0.86) % 1 : 0;
+        placePhotonOnPath(els.photonFast1, els.beamFast, pathLengths.fast, uFast1, t >= 1.18);
+        placePhotonOnPath(els.photonFast2, els.beamFast, pathLengths.fast, uFast2, t >= 1.35);
+
+        const uDeep1 = t >= 1.30 ? ((t - 1.30) * 0.85 + 0.58) % 1 : 0;
+        const uDeep2 = t >= 1.30 ? ((t - 1.30) * 0.85 + 0.16) % 1 : 0;
+        placePhotonOnPath(els.photonDeep1, els.beamDeep, pathLengths.deep, uDeep1, t >= 1.30);
+        placePhotonOnPath(els.photonDeep2, els.beamDeep, pathLengths.deep, uDeep2, t >= 1.55);
+
+        // 6. Top-Right FAST Card
+        const pFastCard = progress(t, 1.34, 1.78);
+        setEnterStyle(els.fastCard, pFastCard, 12);
+
+        const planeGlide = Math.sin(t * 3.2) * 1.4;
+        els.paperPlaneIcon.style.transform = `translate3d(${planeGlide.toFixed(2)}px, ${(-planeGlide * 0.6).toFixed(2)}px, 0)`;
+
+        els.latencyBars.forEach((bar, idx) => {
+          const barAppear = easeOutCubic(progress(t, 1.45 + idx * 0.035, 1.78 + idx * 0.035));
+          const wave = t > 2.1 ? 1 + 0.12 * Math.sin(t * 5.2 + idx * 0.7) : 1;
+          const hPct = clamp(baseBarHeights[idx] * barAppear * wave * 100, 8, 100);
+          bar.style.height = `${hPct.toFixed(1)}%`;
+          bar.style.opacity = (0.32 + 0.68 * barAppear).toFixed(2);
+        });
+
+        // 7. Bottom-Right DEEP Card
+        const pDeepCard = progress(t, 1.66, 2.08);
+        setEnterStyle(els.deepCard, pDeepCard, 12);
+
+        const gearAngle = t * 46;
+        els.deepGearSvg.style.transform = `rotate(${gearAngle.toFixed(1)}deg)`;
+
+        const stepThresholds = [2.05, 2.45, 2.82];
+        els.deepSteps.forEach((stepEl, i) => {
+          const pStep = easeOutCubic(progress(t, 1.82 + i * 0.22, 2.12 + i * 0.22));
+          stepEl.style.opacity = (0.25 + 0.75 * pStep).toFixed(3);
+          stepEl.style.transform = `translate3d(${((1 - pStep) * 8).toFixed(2)}px, 0, 0)`;
+          if (t >= stepThresholds[i]) {
+            stepEl.classList.add('done');
+          } else {
+            stepEl.classList.remove('done');
+          }
+        });
+
+        // 8. Bottom-Left routing.log Live Micro-Terminal
+        const pTerm = progress(t, 1.50, 1.92);
+        setEnterStyle(els.terminalCard, pTerm, 12);
+
+        const livePulse = 0.65 + 0.35 * Math.sin(t * 5.5);
+        els.liveDot.style.opacity = livePulse.toFixed(2);
+
+        const logRows = Array.from(els.termBody.children);
+        const logTimings = [1.76, 2.32, 2.86];
+        logRows.forEach((row, idx) => {
+          const startT = logTimings[idx] !== undefined ? logTimings[idx] : 2.86;
+          const pRow = easeOutCubic(progress(t, startT, startT + 0.28));
+          row.style.opacity = pRow.toFixed(3);
+          row.style.transform = `translate3d(0, ${((1 - pRow) * 8).toFixed(2)}px, 0)`;
+        });
+
+        // 9. Supporting Bottom Chrome
+        setEnterStyle(els.pillsStrip, progress(t, 0.20, 0.75), 8);
+        setEnterStyle(els.metricsGrid, progress(t, 0.32, 0.90), 10);
+        setEnterStyle(els.subtitleCapsule, progress(t, 0.40, 1.00), 10);
+      }
+
+      function tick(now) {
+        if (!isPlaying) return;
+        if (!lastFrameTs) lastFrameTs = now;
+        const dt = Math.min((now - lastFrameTs) / 1000, 0.08);
+        lastFrameTs = now;
+
+        let nextT = currentTime + dt;
+        if (nextT >= DURATION) {
+          nextT = 0;
+        }
+        renderAtTime(nextT);
+        rafId = requestAnimationFrame(tick);
+      }
+
+      function setPlaying(play) {
+        isPlaying = play;
+        if (els.playPauseBtn) {
+          els.playPauseBtn.textContent = isPlaying ? '⏸ 暂停时间轴' : '▶ 播放完整生长';
+        }
+        if (isPlaying) {
+          lastFrameTs = 0;
+          if (currentTime >= DURATION - 0.05) {
+            currentTime = 0;
+          }
+          rafId = requestAnimationFrame(tick);
+        } else if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+      }
+
+      // Deterministic Global Seek Interface
+      window.seek = function (t) {
+        liveModeActive = false;
+        setPlaying(false);
+        if (els.modeBadge) {
+          els.modeBadge.textContent = 'TIMELINE · SEEK';
+        }
+        renderAtTime(t);
+      };
+
+      const fastSamples = [
+        { q: '把这段报错翻译成中文并给一句话原因', log: '报错秒译与摘要提取', dur: '0.36s', conf: '0.99', tps: '214 tok/s' },
+        { q: '生成匹配手机号与邮箱的正则表达式', log: '正则模板极速生成', dur: '0.41s', conf: '0.98', tps: '198 tok/s' },
+        { q: '把会议纪要润色成 3 条清晰结论', log: '纪要结构化秒级润色', dur: '0.38s', conf: '0.99', tps: '206 tok/s' }
+      ];
+
+      const deepSamples = [
+        { q: '重构支付模块，顺便补测试', log: '重构支付核心逻辑', dur: '5.0s', conf: '0.97' },
+        { q: '排查分布式锁死锁并输出修复补丁', log: '死锁推演与补丁自检', dur: '5.4s', conf: '0.96' },
+        { q: '设计多租户 RBAC 权限表与迁移脚本', log: '多租户Schema深推', dur: '4.9s', conf: '0.98' }
+      ];
+
+      let fastIdx = 0;
+      let deepIdx = 0;
+      let toggleAutoIdx = 0;
+
+      function nowTimeString() {
+        const d = new Date();
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        const ss = String(d.getSeconds()).padStart(2, '0');
+        return `${hh}:${mm}:${ss}`;
+      }
+
+      function appendLiveLog(kind, message, durationText) {
+        const row = document.createElement('div');
+        row.className = 'log-row';
+        row.style.opacity = '0';
+        row.style.transform = 'translate3d(0, 8px, 0)';
+        row.style.transition = 'opacity 0.24s ease, transform 0.24s cubic-bezier(0.22, 1, 0.36, 1)';
+
+        const tsSpan = document.createElement('span');
+        tsSpan.className = 'log-ts';
+        tsSpan.textContent = nowTimeString();
+
+        const tagSpan = document.createElement('span');
+        tagSpan.className = `log-tag ${kind}`;
+        tagSpan.textContent = kind.toUpperCase();
+
+        const msgSpan = document.createElement('span');
+        msgSpan.className = 'log-msg';
+        msgSpan.textContent = message;
+
+        const durSpan = document.createElement('span');
+        durSpan.className = 'log-dur';
+        durSpan.textContent = durationText;
+
+        row.append(tsSpan, tagSpan, msgSpan, durSpan);
+        els.termBody.appendChild(row);
+
+        while (els.termBody.children.length > 3) {
+          els.termBody.removeChild(els.termBody.firstElementChild);
+        }
+
+        requestAnimationFrame(() => {
+          row.style.opacity = '1';
+          row.style.transform = 'translate3d(0, 0, 0)';
+        });
+      }
+
+      function triggerLiveRoute(mode) {
+        liveModeActive = true;
+        if (els.modeBadge) {
+          els.modeBadge.textContent = mode === 'fast' ? 'LIVE · FAST 轨道' : 'LIVE · DEEP 轨道';
+        }
+
+        if (currentTime < 3.2) {
+          renderAtTime(DEFAULT_SHOT_TIME);
+        }
+
+        els.keycapUnit.classList.add('pressed');
+        els.keywellLed.style.opacity = '0.98';
+        setTimeout(() => {
+          els.keycapUnit.classList.remove('pressed');
+          els.keywellLed.style.opacity = '0.62';
+        }, 220);
+
+        if (mode === 'fast') {
+          const item = fastSamples[fastIdx % fastSamples.length];
+          fastIdx++;
+          els.rcQuerySpan.textContent = item.q;
+          els.rcCand1Text.textContent = 'Auto Route · 识别为轻任务 → 极速通道';
+          els.rcRoutePill1.style.opacity = '1';
+          els.rcRoutePill2.style.opacity = '0.35';
+          els.routerConfVal.textContent = item.conf;
+          els.fastTimeVal.textContent = item.dur;
+          els.fastTpsVal.textContent = item.tps;
+
+          els.fastCard.classList.add('card-flash-cyan');
+          els.deepCard.classList.remove('card-flash-amber');
+          setTimeout(() => els.fastCard.classList.remove('card-flash-cyan'), 650);
+
+          appendLiveLog('fast', item.log, item.dur);
+        } else {
+          const item = deepSamples[deepIdx % deepSamples.length];
+          deepIdx++;
+          els.rcQuerySpan.textContent = item.q;
+          els.rcCand1Text.textContent = 'Auto Route · 识别为复杂工程 → 深度推理';
+          els.rcRoutePill1.style.opacity = '0.35';
+          els.rcRoutePill2.style.opacity = '1';
+          els.routerConfVal.textContent = item.conf;
+
+          els.deepCard.classList.add('card-flash-amber');
+          els.fastCard.classList.remove('card-flash-cyan');
+
+          els.deepSteps.forEach((s) => s.classList.remove('done'));
+          els.deepSteps.forEach((s, idx) => {
+            setTimeout(() => s.classList.add('done'), 120 + idx * 160);
+          });
+          setTimeout(() => els.deepCard.classList.remove('card-flash-amber'), 750);
+
+          appendLiveLog('deep', item.log, item.dur);
+        }
+
+        if (!isPlaying) {
+          setPlaying(true);
+          currentTime = 3.25;
+        }
+      }
+
+      if (els.timelineSlider) {
+        els.timelineSlider.addEventListener('input', (e) => {
+          window.seek(parseFloat(e.target.value));
+        });
+      }
+
+      if (els.playPauseBtn) {
+        els.playPauseBtn.addEventListener('click', () => {
+          liveModeActive = false;
+          if (els.modeBadge) els.modeBadge.textContent = 'TIMELINE · 4.5s';
+          setPlaying(!isPlaying);
+        });
+      }
+
+      if (els.replayBtn) {
+        els.replayBtn.addEventListener('click', () => {
+          liveModeActive = false;
+          els.rcCand1Text.textContent = 'Auto Route · 智能混合意图分流';
+          els.rcRoutePill1.style.opacity = '1';
+          els.rcRoutePill2.style.opacity = '1';
+          els.fastTimeVal.textContent = '0.4s';
+          if (els.modeBadge) els.modeBadge.textContent = 'TIMELINE · 4.5s';
+          currentTime = 0;
+          renderAtTime(0);
+          setPlaying(true);
+        });
+      }
+
+      document.querySelectorAll('.cue-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          const target = parseFloat(chip.getAttribute('data-seek') || String(DEFAULT_SHOT_TIME));
+          window.seek(target);
+        });
+      });
+
+      if (els.simFastBtn) {
+        els.simFastBtn.addEventListener('click', () => triggerLiveRoute('fast'));
+      }
+
+      if (els.simDeepBtn) {
+        els.simDeepBtn.addEventListener('click', () => triggerLiveRoute('deep'));
+      }
+
+      if (els.keycapUnit) {
+        els.keycapUnit.addEventListener('click', () => {
+          const nextMode = toggleAutoIdx % 2 === 0 ? 'fast' : 'deep';
+          toggleAutoIdx++;
+          triggerLiveRoute(nextMode);
+        });
+      }
+
+      window.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+          e.preventDefault();
+          const nextMode = toggleAutoIdx % 2 === 0 ? 'fast' : 'deep';
+          toggleAutoIdx++;
+          triggerLiveRoute(nextMode);
+        }
+      });
+
+      if (document.fonts && document.fonts.load) {
+        document.fonts.load("400 16px 'RouHei'");
+      }
+
+      if (isShotMode) {
+        renderAtTime(DEFAULT_SHOT_TIME);
+      } else {
+        renderAtTime(0);
+        setPlaying(true);
+      }
+    })();
+  </script>
+</body>
+</html>

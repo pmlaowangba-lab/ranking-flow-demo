@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>黄白纸风 · 正文口播动态流程参考（P01–P06 · Opus 5.5 工艺）</title>
+<style>
+@font-face {
+  font-family: 'RouHei';
+  src: url('./assets/RouHei.ttf') format('truetype');
+  font-weight: 400; /* 单字重：粗体由浏览器统一合成，避免 CJK 回退字重不均 */
+  font-display: block;
+}
+:root {
+  --ff: 'RouHei', -apple-system, 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  --fn: -apple-system, 'SF Pro Display', 'RouHei', 'PingFang SC', sans-serif;
+  --fm: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  --ink: #14161D; --ink2: #5B6170; --ink3: #9AA0AC; --line: #E6E0D3; --paper: #F7F4EC;
+  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .28 0 0 0 0 .18 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #EFEBE1; }
+body {
+  color: var(--ink); font-family: var(--ff); min-height: 100vh; padding: 36px 32px 80px;
+  background: radial-gradient(1100px 520px at 12% -8%, rgba(37,99,235,.06), transparent 60%), radial-gradient(900px 500px at 100% 6%, rgba(217,119,6,.06), transparent 60%), #EFEBE1;
+  -webkit-font-smoothing: antialiased;
+}
+body::before { content: ''; position: fixed; inset: 0; pointer-events: none; background-image: radial-gradient(rgba(20,22,29,.07) 1px, transparent 1.2px); background-size: 22px 22px; }
+.wrap { position: relative; max-width: 1440px; margin: 0 auto; }
+/* header */
+.hdr { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; padding-bottom: 22px; margin-bottom: 28px; border-bottom: 1px solid rgba(20,22,29,.10); }
+.hdr .eyebrow { font-family: var(--fm); font-size: 11px; letter-spacing: 2px; color: var(--ink3); margin-bottom: 10px; }
+.hdr h1 { font-size: 30px; font-weight: 700; letter-spacing: -.3px; color: var(--ink); }
+.hdr h1 em { font-style: normal; color: #2563EB; }
+.hdr p { margin-top: 10px; font-size: 14px; color: var(--ink2); line-height: 1.7; max-width: 860px; }
+.hdr-badges { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; max-width: 470px; }
+.hbadge { padding: 6px 12px; border-radius: 999px; font-size: 12px; color: var(--ink2); background: #fff; box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px rgba(20,22,29,.05); }
+.swatches { display: flex; gap: 6px; align-items: center; margin-top: 14px; font-family: var(--fm); font-size: 11px; color: var(--ink3); }
+.swatches i { width: 14px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+/* player */
+.player-sec { display: grid; grid-template-columns: 362px 1fr; gap: 32px; padding: 26px; margin-bottom: 40px; border-radius: 26px; background: linear-gradient(180deg,#FFFFFF,#FCFBF7); box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px rgba(20,22,29,.05), 0 30px 60px -30px rgba(20,22,29,.25); }
+.player-phone-shell { width: 342px; height: 608px; border-radius: 30px; overflow: hidden; position: relative; background: var(--paper); box-shadow: 0 0 0 1px rgba(20,22,29,.12), 0 0 0 7px #fff, 0 0 0 8px var(--line), 0 30px 60px -20px rgba(20,22,29,.4); margin: 8px auto 0; }
+.player-scale-wrap { width: 1080px; height: 1920px; transform-origin: top left; transform: scale(0.316667); }
+.player-ctrl-col { display: flex; flex-direction: column; gap: 18px; justify-content: space-between; }
+.ctrl-top h2 { font-size: 21px; font-weight: 700; margin-bottom: 8px; }
+.ctrl-top .desc { font-size: 13.5px; color: var(--ink2); line-height: 1.7; }
+.playbar { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 16px; background: #F7F4EC; box-shadow: inset 0 0 0 1px var(--line); }
+.btn-play { border: 0; cursor: pointer; border-radius: 10px; padding: 9px 16px; min-width: 78px; font-family: var(--ff); font-size: 13px; font-weight: 700; color: #fff; background: var(--ink); box-shadow: 0 6px 14px -6px rgba(20,22,29,.6); }
+.scrubber { flex: 1; accent-color: #14161D; cursor: pointer; }
+.time-lbl { font-family: var(--fm); font-size: 12px; color: var(--ink2); min-width: 104px; text-align: right; }
+.scene-pills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.scene-pill { text-align: left; cursor: pointer; color: var(--ink); font-family: var(--ff); padding: 12px 14px; border-radius: 14px; border: 0; background: #fff; box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow .2s, transform .2s; }
+.scene-pill:hover { transform: translateY(-1px); }
+.scene-pill.active { box-shadow: inset 0 0 0 1.5px var(--pc), 0 10px 24px -12px var(--pc); }
+.sp-head { display: flex; justify-content: space-between; align-items: center; }
+.sp-code { font-family: var(--fm); font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px; color: #fff; }
+.sp-time { font-family: var(--fm); font-size: 10.5px; color: var(--ink3); }
+.sp-title { font-size: 13.5px; font-weight: 700; margin-top: 8px; }
+.sp-sub { font-size: 11.5px; color: var(--ink2); margin-top: 3px; line-height: 1.45; }
+.ctrl-note { font-size: 12.5px; line-height: 1.7; color: var(--ink2); padding: 12px 14px; border-radius: 14px; background: #F7F4EC; box-shadow: inset 0 0 0 1px var(--line); }
+.ctrl-note b { color: var(--ink); }
+/* grid */
+.sec-title { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 18px; }
+.sec-title h3 { font-size: 18px; font-weight: 700; }
+.sec-title span { font-size: 12px; color: var(--ink3); }
+.grid6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.grid2 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 40px; }
+.ref-card { cursor: pointer; padding: 14px 14px 16px; border-radius: 24px; background: linear-gradient(180deg,#FFFFFF,#FCFBF7); box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px rgba(20,22,29,.05), 0 18px 40px -26px rgba(20,22,29,.35); transition: transform .25s, box-shadow .25s; }
+.ref-card:hover { transform: translateY(-3px); box-shadow: inset 0 0 0 1px var(--pc), 0 30px 60px -30px var(--pc); }
+.ref-head { display: flex; align-items: center; gap: 10px; padding: 2px 4px 12px; }
+.ref-code { font-family: var(--fm); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 7px; color: #fff; }
+.ref-name { font-size: 14.5px; font-weight: 700; }
+.ref-tag { margin-left: auto; font-size: 11px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50%; }
+.ref-stage-box { width: 100%; aspect-ratio: 9 / 16; border-radius: 18px; overflow: hidden; position: relative; background: var(--paper); box-shadow: 0 0 0 1px rgba(20,22,29,.10), 0 18px 40px -24px rgba(20,22,29,.45); }
+.ref-stage-scaler { width: 1080px; height: 1920px; transform-origin: top left; position: absolute; left: 0; top: 0; }
+.ext-box { width: 100%; aspect-ratio: 476 / 460; border-radius: 18px; overflow: hidden; position: relative; background: #fff; box-shadow: inset 0 0 0 1px var(--line); }
+/* modal */
+.modal-bg { position: fixed; inset: 0; z-index: 99; display: none; align-items: center; justify-content: center; gap: 32px; background: rgba(239,235,225,.86); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.modal-bg.open { display: flex; }
+.modal-stage { border-radius: 26px; overflow: hidden; box-shadow: 0 0 0 1px rgba(20,22,29,.12), 0 50px 100px -30px rgba(20,22,29,.45); position: relative; background: var(--paper); }
+.modal-side { width: 300px; display: flex; flex-direction: column; gap: 14px; }
+.modal-side .m-code { align-self: flex-start; font-family: var(--fm); font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 7px; color: #fff; }
+.modal-side h4 { font-size: 20px; font-weight: 700; }
+.modal-side p { font-size: 13px; line-height: 1.75; color: var(--ink2); }
+.m-btns { display: flex; gap: 10px; }
+.m-btn { border: 0; cursor: pointer; font-family: var(--ff); font-size: 13px; font-weight: 700; padding: 10px 16px; border-radius: 11px; color: var(--ink); background: #fff; box-shadow: inset 0 0 0 1px var(--line); }
+.m-btn.pri { color: #fff; background: var(--ink); }
+/* board */
+body.board-mode { padding: 34px 34px 40px; }
+body.board-mode .player-sec, body.board-mode .hdr-badges, body.board-mode .ext-sec { display: none; }
+body.board-mode .hdr { margin-bottom: 22px; padding-bottom: 18px; }
+body.board-mode .grid6 { gap: 22px; }
+
+/* =====================================================================
+   STAGE · 1080 × 1920 黄白纸风 正文外框（与 黄白纸风.template.html 同一套尺寸）
+   ===================================================================== */
+.stage { position: relative; width: 1080px; height: 1920px; overflow: hidden; font-family: var(--ff); color: var(--ink); background: var(--paper); isolation: isolate; }
+.st-bg { position: absolute; inset: 0; z-index: -3; background: radial-gradient(80% 26% at 50% -4%, var(--a10), transparent 72%), radial-gradient(60% 28% at 100% 58%, rgba(217,119,6,.05), transparent 70%), linear-gradient(180deg, #FBF9F3 0%, #F7F4EC 42%, #F2EEE3 100%); }
+.st-dots { position: absolute; inset: 0; z-index: -2; background-image: radial-gradient(rgba(20,22,29,.09) 1.3px, transparent 1.5px); background-size: 32px 32px; background-position: 16px 16px; -webkit-mask: linear-gradient(180deg, #000 0%, rgba(0,0,0,.45) 100%); mask: linear-gradient(180deg, #000 0%, rgba(0,0,0,.45) 100%); }
+.st-noise { position: absolute; inset: 0; z-index: -1; background-image: var(--noise); opacity: .10; mix-blend-mode: multiply; pointer-events: none; }
+.nav { position: absolute; left: 64px; right: 64px; top: 165px; height: 42px; display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(255,255,255,.86); box-shadow: inset 0 0 0 1.5px var(--line), 0 1px 2px rgba(20,22,29,.05), 0 10px 24px -14px rgba(20,22,29,.22); }
+.nav-i { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; font-size: 20px; color: var(--ink3); white-space: nowrap; }
+.nav-i .n { font-family: var(--fm); font-size: 15px; }
+.nav-i.done { color: var(--ink2); }
+.nav-i.on { background: var(--ink); color: #fff; font-weight: 700; box-shadow: 0 6px 14px -6px rgba(20,22,29,.55); }
+.nav-i.on .n { color: var(--a-on); }
+.ttl { position: absolute; left: 64px; right: 64px; top: 232px; height: 84px; font-size: 72px; line-height: 84px; font-weight: 700; letter-spacing: -1px; white-space: nowrap; color: var(--ink); }
+.ttl .kw { color: var(--a); background: linear-gradient(0deg, var(--a14) 0 20px, transparent 20px) no-repeat 0 92% / 100% 100%; }
+.sub { position: absolute; left: 64px; right: 64px; top: 334px; height: 42px; display: flex; align-items: center; gap: 16px; font-size: 31px; color: var(--ink2); white-space: nowrap; }
+.sub i { width: 30px; height: 5px; border-radius: 3px; background: var(--a); flex: none; }
+.frame { position: absolute; left: 64px; top: 416px; width: 952px; height: 920px; border-radius: 40px; overflow: hidden;
+  background: radial-gradient(90% 46% at 50% 0%, var(--a06), transparent 70%), linear-gradient(180deg, #FFFFFF 0%, #FCFBF7 100%);
+  box-shadow: inset 0 0 0 2px var(--line), inset 0 3px 0 #fff, 0 2px 4px rgba(20,22,29,.05), 0 30px 70px -24px rgba(20,22,29,.22); }
+.frame::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(rgba(20,22,29,.06) 1.4px, transparent 1.6px); background-size: 28px 28px; background-position: 14px 14px; pointer-events: none; }
+.frame-in { position: absolute; inset: 0; }
+.chips { position: absolute; left: 64px; right: 64px; top: 1360px; height: 56px; display: flex; gap: 14px; }
+.chip { height: 56px; padding: 0 26px 0 22px; border-radius: 999px; display: flex; align-items: center; gap: 12px; font-size: 25px; color: #3A3F4B; white-space: nowrap; background: #fff; box-shadow: inset 0 0 0 1.5px var(--line), 0 1px 2px rgba(20,22,29,.05), 0 10px 20px -12px rgba(20,22,29,.22); }
+.chip i { width: 10px; height: 10px; border-radius: 50%; background: var(--a); flex: none; }
+.chip.hi { color: #fff; background: var(--a); box-shadow: 0 10px 22px -10px var(--a50); }
+.chip.hi i { background: #fff; }
+.cards { position: absolute; left: 64px; right: 64px; top: 1440px; height: 136px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.card { position: relative; border-radius: 28px; padding: 24px 28px 0; background: linear-gradient(180deg, #FFFFFF, #FCFBF7); box-shadow: inset 0 0 0 1.5px var(--line), inset 0 2px 0 #fff, 0 2px 4px rgba(20,22,29,.05), 0 18px 36px -16px rgba(20,22,29,.2); }
+.card::before { content: ''; position: absolute; left: 28px; top: 0; width: 44px; height: 5px; border-radius: 0 0 4px 4px; background: var(--a); }
+.card .v { font-family: var(--fn); font-size: 54px; font-weight: 800; letter-spacing: -1.5px; line-height: 1; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.card:first-child .v { color: var(--a); }
+.card .l { margin-top: 13px; font-size: 22px; color: var(--ink2); white-space: nowrap; }
+.capsule { position: absolute; left: 64px; right: 64px; top: 1604px; min-height: 150px; padding: 26px 52px; border-radius: 44px; display: flex; align-items: center; justify-content: center; text-align: center;
+  background: linear-gradient(180deg, #1C1F28, #14161D); color: rgba(255,255,255,.34); font-size: 60px; line-height: 1.42; font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.10), inset 0 0 0 1px rgba(255,255,255,.04), 0 2px 4px rgba(20,22,29,.18), 0 28px 56px -22px rgba(20,22,29,.55); }
+.capsule .cx { text-wrap: balance; }
+.capsule .c.on { color: #fff; }
+.capsule .kw { white-space: nowrap; position: relative; }
+.capsule .kw .c.on { color: #FFD25E; }
+.capsule .kw::after { content: ''; position: absolute; left: 2px; right: 2px; bottom: 4px; height: 6px; border-radius: 3px; background: var(--a); opacity: var(--kwbar, 1); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <div>
+      <div class="eyebrow">WARM PAPER · 9:16 · NARRATION FLOW REFERENCE · P01–P06</div>
+      <h1>黄白纸风 · 正文口播动态流程参考（P01–P06）</h1>
+      <p>日系瑞士编辑室 × Apple 工业纸感 × 物理印刷阴影：暖米白纸底 + 微点阵，主视觉舞台 952×920（@1080p）承载 <b>FX_PAPER_FLOWS</b> 6 大口播动态流；纯白实体卡纸 + 多层柔和真实阴影 + #E6E0D3 极细描边，每套流程都「从一个模块生长出下一个模块」。</p>
+      <div class="swatches">底 <i style="background:#F7F4EC"></i> 墨 <i style="background:#14161D"></i> 次 <i style="background:#5B6170"></i> · 主题 <i style="background:#2563EB"></i><i style="background:#0F9D76"></i><i style="background:#D97706"></i><i style="background:#E11D48"></i><i style="background:#6D28D9"></i></div>
+    </div>
+    <div class="hdr-badges">
+      <span class="hbadge">1080×1920 原生画布</span>
+      <span class="hbadge">FX_PAPER_FLOWS.render(el, spec, p, theme)</span>
+      <span class="hbadge">window.seek(t) 确定性驱动</span>
+      <span class="hbadge">27s · 6 套连播</span>
+      <span class="hbadge">?board=1 总览截图</span>
+    </div>
+  </header>
+
+  <section class="player-sec" id="playerSec">
+    <div class="player-stage-col"><div class="player-phone-shell"><div class="player-scale-wrap" id="liveStageMount"></div></div></div>
+    <div class="player-ctrl-col">
+      <div class="ctrl-top">
+        <h2>27 秒连播 · 6 套黄白纸风口播流程</h2>
+        <div class="desc">每套 4.5 秒：前 ~3.1 秒逐级生长（模块 A → 光纤/连线 → 模块 B → 成品），后 ~1.4 秒完整定格，方便剪辑对齐口播节奏。拖动进度条或点击下方卡片跳到任一套。</div>
+      </div>
+      <div class="playbar">
+        <button class="btn-play" id="btnPlay">暂停</button>
+        <input class="scrubber" id="scrubber" type="range" min="0" max="27" step="0.01" value="0" />
+        <span class="time-lbl" id="timeLbl">00.0s / 27.0s</span>
+      </div>
+      <div class="scene-pills" id="scenePills"></div>
+      <div class="ctrl-note"><b>材质规范：</b>舞台 = 白纸卡 + 2px #E6E0D3 内描边 + 3px 顶部纸面高光 + 主题色极淡顶光 + 细点阵；模块统一用实体白卡纸（<b>0 1px 2px / 0 12px 32px</b> 双层阴影）、铝/钛金属、磨砂亚克力与厚卡纸侧边，拒绝粗黑线框与简笔画。导出视频时 headless 按帧调用 <b>window.seek(t)</b>。</div>
+    </div>
+  </section>
+
+  <div class="sec-title">
+    <h3>6 套黄白纸风流程 · 定格总览（点击任意屏 1:1 放大并重播生长）</h3>
+    <span>每屏均为真实 9:16 模板版式 · 流程完整展开态</span>
+  </div>
+  <div class="grid6" id="grid6"></div>
+
+  <div class="ext-sec">
+    <div class="sec-title" style="margin-top:44px">
+      <h3>扩展流 · ab_compare / kinetic_meter / paper_funnel 自定义文案</h3>
+      <span>同一 render() 接口，任意尺寸容器等比放大</span>
+    </div>
+    <div class="grid2" id="grid2"></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal-stage" id="modalStage"><div id="modalMount" style="width:1080px;height:1920px;transform-origin:top left;"></div></div>
+  <div class="modal-side">
+    <span class="m-code" id="modalCode">P01</span>
+    <h4 id="modalTitle"></h4>
+    <p id="modalDesc"></p>
+    <div class="m-btns"><button class="m-btn pri" id="modalReplay">重播生长</button><button class="m-btn" id="modalClose">关闭</button></div>
+  </div>
+</div>
+
+<script src="./fx-paper-flows.core.js"></script>
+<script>
+const FXP = window.FX_PAPER_FLOWS;
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+const mixW = (hex, k) => { const n = parseInt(hex.slice(1), 16); return '#' + [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (255 - v) * k).toString(16).padStart(2, '0')).join(''); };
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const kwHTML = (s) => esc(s).replace(/【(.+?)】/g, '<span class="kw">$1</span>');
+
+const NAV = ['舆情', '路由', '遥控', '架构', '整理', '记忆'];
+const SCENES = [
+  { id: 'P01', type: 'paper_funnel', accent: '#2563EB', nav: 0, name: '瑞士精印 · 多源漏斗筛选流', styleTag: 'Swiss Print · 磨砂亚克力漏斗',
+    title: '一词抓全网，【漏斗砍水贴】', sub: '多源并发抓取 → 漏斗过滤 82% 噪音 → 吐出痛点简报',
+    chips: ['4 大社区并发', '过滤 82% 水贴', '附原帖出处'], kpis: [{ v: '1,284', l: '条讨论同步抓取' }, { v: '-82%', l: '营销水贴过滤' }, { v: '12s', l: '生成结构简报' }],
+    subtitle: ['丢给它一个词，', '漏斗直接砍掉 82% 水贴', '吐出痛点报告'],
+    desc: '纯白精印搜索框打字 → Reddit / HN / GitHub / X 真实品牌彩标（白边贴纸质感）弹出 → 曲线粒子汇入磨砂白亚克力漏斗（椭圆口 + 双层细滤网 + 柔和投影）→ 4 枚珊瑚红划线水贴标签弧线弹开 → 漏斗口吐出精印痛点简报卡，排行进度条逐条填充。' },
+  { id: 'P02', type: 'paper_router', accent: '#0F9D76', nav: 1, name: '工业键帽 · 智能道岔分流', styleTag: 'Teenage Engineering · 象牙键帽 + 罗盘路由',
+    title: '一键自动路由，【快慢不串台】', sub: '按下 ⌘K → 意图识别分流 → 轻任务秒回，重任务深推',
+    chips: ['⌘K 零配置', '双轨智能路由', '省 65% Token'], kpis: [{ v: '0.4s', l: '轻任务响应' }, { v: '6 步', l: '重任务深度推理' }, { v: '-65%', l: '无效算力消耗' }],
+    subtitle: ['按一次快捷键，', '路由核把轻重任务分轨跑', '又快又省钱'],
+    desc: '铝制托盘上的象牙白立体键帽 ⌘ K（微凹顶面 + 按压下沉 + 暖色 LED 亮起）→ Raycast 浅色命令栏弹出 → 光纤冲入精密罗盘刻度路由核 → 上路展开纸飞机「极速轻模型 0.4s」柱状卡，下路展开琥珀齿轮「深度推理链」3 步勾选卡，左下纸感终端日志逐行记录。' },
+  { id: 'P03', type: 'paper_remote', accent: '#6D28D9', nav: 2, name: 'Apple 浅色 · 手机遥控电脑', styleTag: 'Apple Continuity · 钛银 iPhone + MacBook',
+    title: '手机发语音，【电脑自己干活】', sub: '手机随口下令 → 跨端派发 → 电脑跑完自动回传',
+    chips: ['远程遥控执行', '后台静默跑完', '结果自动推送'], kpis: [{ v: '0:03', l: '一句语音下令' }, { v: '41s', l: '本机全权限执行' }, { v: '秒回传', l: '成品推到手机' }],
+    subtitle: ['你在外面对手机说一句，', '家里电脑跑完再推回来', '彻底解放双手'],
+    desc: '钛银边框浅色 iPhone，灵动岛展开真实声波 → 双色曲线流光飞向浅灰铝壳 MacBook → 屏内浅色终端逐行语法高亮、绿灯 Done → 绿色光轨回传，手机顶部弹出毛玻璃通知「已完成 · 点击预览」，右下接力时间线同步点亮。' },
+  { id: 'P04', type: 'paper_slabs', accent: '#D97706', nav: 3, name: '精装厚卡纸 · 等轴测三层架构', styleTag: 'Stripe 2.5D · 厚卡纸 + 磨砂玻璃',
+    title: '三层流水线，【原料变成品】', sub: '底层接入原料 → 中层清洗提纯 → 顶层一键成稿',
+    chips: ['三层解耦架构', '无感自动流转', '成品零返工'], kpis: [{ v: '4 类', l: '原料自动接入' }, { v: '-37%', l: '噪声被清洗' }, { v: '1 键', l: '直出可发布稿' }],
+    subtitle: ['底层采料、中层清洗，', '顶层直接吐出可发布成稿', '全链路一条龙'],
+    desc: '精确仿射矩阵贴合的等轴测三层：底/顶为精装厚卡纸（侧边书页纹 + 主题色色带），中层为磨砂玻璃板；顶面内嵌微缩文档格 / 清洗扫描条 / 精排成稿 + 暖金印章；琥珀流光向上托举，右侧建筑图纸风引线逐层标注。' },
+  { id: 'P05', type: 'paper_laser', accent: '#2563EB', nav: 4, name: '暖光扫描仪 · 乱麻变清单', styleTag: 'Optical Scanner · 克莱因蓝 + 暖金光幕',
+    title: '一团乱麻，【一扫变待办】', sub: '杂乱录音与聊天 → 光学扫描提纯 → 整齐待办清单',
+    chips: ['乱麻秒变清单', '自动认领负责人', '一键同步日程'], kpis: [{ v: '47 条', l: '杂乱原始碎片' }, { v: '3 项', l: '提纯核心待办' }, { v: '100%', l: '附带截止时间' }],
+    subtitle: ['把一团乱麻丢进去，', '一道光扫过就变整齐清单', '看着都解压'],
+    desc: '套准十字线框内是三层景深的手写便利贴 / 白纸条 / 虚化纸片与暗红乱线 → 一道克莱因蓝芯 + 暖金光晕的光学扫描条带光幕拖尾扫过，碎片褪色失焦 → 读数胶囊「提纯完成 · 47 → 3」→ 下方逐张弹跳长出白卡待办（打勾、P0/P1/P2 色标、头像、截止时间）。' },
+  { id: 'P06', type: 'paper_flywheel', accent: '#E11D48', nav: 5, name: '瑞士排印大数 · 记忆闭环飞轮', styleTag: 'Swiss Typography · 超大数字 + 暖纸飞轮',
+    title: '越用越懂你，【越跑越省时】', sub: '每次对话沉淀记忆，下一次开口直接秒懂',
+    chips: ['耗时直降 78%', '长期记忆沉淀', '下次开口秒懂'], kpis: [{ v: '-78%', l: '重复沟通耗时' }, { v: '37 条', l: '偏好写入记忆' }, { v: '自进化', l: '越用越贴合' }],
+    subtitle: ['每次对话自动存笔记，', '下次开口直接秒懂你', '耗时直降 78%'],
+    desc: '上半区瑞士排印超大号 −78% 从 0 计数，刻度尺上「现在 3 min」能量条从 15 min 收缩；下半区椭圆光轨闭环：几何人像光环 → 光学放大镜 → 线圈笔记本 → 暖金弧线回流点亮微发光灯泡，中心实时累计「已记住 37 条偏好」。' }
+];
+SCENES.forEach((s) => { s.a = {}; [6, 10, 14, 20, 30, 50].forEach((n) => (s.a[n] = hexA(s.accent, n / 100))); s.aOn = mixW(s.accent, 0.35); });
+
+function createStageHTML(sc, opt = {}) {
+  const nav = NAV.map((l, i) => `<div class="nav-i ${i === sc.nav ? 'on' : (i < sc.nav ? 'done' : '')}"><span class="n">0${i + 1}</span>${l}</div>`).join('');
+  const chips = sc.chips.map((c, i) => `<div class="chip ${i === 1 ? 'hi' : ''}"><i></i>${esc(c)}</div>`).join('');
+  const kpis = sc.kpis.map((k) => `<div class="card"><div class="v">${esc(k.v)}</div><div class="l">${esc(k.l)}</div></div>`).join('');
+  const vars = `--a:${sc.accent};--a06:${sc.a[6]};--a10:${sc.a[10]};--a14:${sc.a[14]};--a20:${sc.a[20]};--a30:${sc.a[30]};--a50:${sc.a[50]};--a-on:${sc.aOn};`;
+  const chars = (s) => [...s].map((c) => `<span class="c on">${esc(c)}</span>`).join('');
+  return `<div class="stage" style="${vars}">
+    <div class="st-bg"></div><div class="st-dots"></div><div class="st-noise"></div>
+    <div class="nav">${nav}</div>
+    <div class="ttl">${kwHTML(sc.title)}</div>
+    <div class="sub"><i></i><span>${esc(sc.sub)}</span></div>
+    <div class="frame"><div class="frame-in" data-flow-mount="${sc.id}"></div></div>
+    <div class="chips">${chips}</div>
+    <div class="cards">${kpis}</div>
+    <div class="capsule"><div class="cx">${chars(sc.subtitle[0])}<span class="kw">${chars(sc.subtitle[1])}</span>${chars('，' + sc.subtitle[2])}</div></div>
+  </div>`;
+}
+function paint(root, sc, p) {
+  const m = root.querySelector(`[data-flow-mount="${sc.id}"]`);
+  if (m) FXP.render(m, { type: sc.type, width: 952, height: 920 }, p, sc.accent);
+}
+
+/* grid */
+const grid6 = document.getElementById('grid6');
+SCENES.forEach((sc, idx) => {
+  const card = document.createElement('div');
+  card.className = 'ref-card';
+  card.style.setProperty('--pc', sc.a[30]);
+  card.innerHTML = `<div class="ref-head"><span class="ref-code" style="background:${sc.accent}">${sc.id}</span><span class="ref-name">${sc.name.split(' · ')[1]}</span><span class="ref-tag">${sc.styleTag}</span></div>
+    <div class="ref-stage-box"><div class="ref-stage-scaler">${createStageHTML(sc)}</div></div>`;
+  card.addEventListener('click', () => openModal(idx));
+  grid6.appendChild(card);
+  paint(card, sc, 1);
+});
+/* extra flows */
+const EXT = [
+  { t: 'ab_compare', c: '#0F9D76', n: '左右对照卡', s: '以前 vs 现在' },
+  { t: 'kinetic_meter', c: '#2563EB', n: '单指标大字冲击', s: '半环仪表 + 增长曲线' },
+  { t: 'paper_funnel', c: '#D97706', n: '漏斗 · 自定义文案', s: 'spec 覆盖 query / rows', spec: { query: 'DeepSeek 插件，大家都在夸哪几个？', briefTitle: '口碑简报 · DeepSeek 插件', rows: [['记忆不丢上下文', 41], ['省 Token 明显', 33], ['装完就能用', 22]] } }
+];
+const grid2 = document.getElementById('grid2');
+EXT.forEach((e) => {
+  const card = document.createElement('div'); card.className = 'ref-card'; card.style.setProperty('--pc', hexA(e.c, 0.3));
+  card.innerHTML = `<div class="ref-head"><span class="ref-code" style="background:${e.c}">${e.t}</span><span class="ref-name">${e.n}</span><span class="ref-tag">${e.s}</span></div><div class="ext-box"></div>`;
+  grid2.appendChild(card);
+  e.box = card.querySelector('.ext-box');
+});
+function resizeGridScalers() {
+  document.querySelectorAll('.ref-stage-box').forEach((box) => { const s = box.querySelector('.ref-stage-scaler'); if (s && box.clientWidth > 0) s.style.transform = `scale(${box.clientWidth / 1080})`; });
+  EXT.forEach((e) => FXP.render(e.box, Object.assign({ type: e.t }, e.spec || {}), 1, e.c));
+}
+window.addEventListener('resize', resizeGridScalers);
+resizeGridScalers();
+
+/* live player */
+const SEG_DUR = 4.5, GROW = 3.1, TOTAL_DUR = SEG_DUR * SCENES.length;
+const liveStageMount = document.getElementById('liveStageMount');
+const scenePills = document.getElementById('scenePills');
+const scrubber = document.getElementById('scrubber'), timeLbl = document.getElementById('timeLbl'), btnPlay = document.getElementById('btnPlay');
+SCENES.forEach((sc, idx) => {
+  const b = document.createElement('button'); b.className = 'scene-pill'; b.style.setProperty('--pc', sc.accent);
+  b.innerHTML = `<div class="sp-head"><span class="sp-code" style="background:${sc.accent}">${sc.id}</span><span class="sp-time">${(idx * SEG_DUR).toFixed(1)}–${((idx + 1) * SEG_DUR).toFixed(1)}s</span></div><div class="sp-title">${sc.name.split(' · ')[1]}</div><div class="sp-sub">${sc.styleTag}</div>`;
+  b.addEventListener('click', () => window.seek(idx * SEG_DUR + 0.001));
+  scenePills.appendChild(b);
+});
+let curTime = 0, playing = true, lastScene = -1;
+window.seek = function (t) {
+  curTime = ((t % TOTAL_DUR) + TOTAL_DUR) % TOTAL_DUR;
+  const idx = Math.min(SCENES.length - 1, Math.floor(curTime / SEG_DUR));
+  const p = clamp((curTime - idx * SEG_DUR) / GROW);
+  if (idx !== lastScene) { liveStageMount.innerHTML = createStageHTML(SCENES[idx]); lastScene = idx; document.querySelectorAll('.scene-pill').forEach((el, i) => el.classList.toggle('active', i === idx)); }
+  paint(liveStageMount, SCENES[idx], p);
+  scrubber.value = curTime.toFixed(2);
+  timeLbl.textContent = `${curTime.toFixed(1).padStart(4, '0')}s / ${TOTAL_DUR.toFixed(1)}s`;
+  return { scene: SCENES[idx].id, progress: p };
+};
+window.DURATION = TOTAL_DUR;
+btnPlay.addEventListener('click', () => { playing = !playing; btnPlay.textContent = playing ? '暂停' : '播放'; });
+scrubber.addEventListener('input', (e) => { playing = false; btnPlay.textContent = '播放'; window.seek(parseFloat(e.target.value)); });
+let lastTs = performance.now();
+function tick(now) { const dt = Math.min(0.05, (now - lastTs) / 1000); lastTs = now; if (playing && !document.body.classList.contains('board-mode')) window.seek(curTime + dt); requestAnimationFrame(tick); }
+window.seek(0); requestAnimationFrame(tick);
+
+/* modal */
+const modalBg = document.getElementById('modalBg'), modalMount = document.getElementById('modalMount'), modalStage = document.getElementById('modalStage');
+let modalIdx = 0, modalRaf = null;
+function fitModal() { const s = Math.min(0.5, (window.innerHeight - 64) / 1920); modalMount.style.transform = `scale(${s})`; modalStage.style.width = `${1080 * s}px`; modalStage.style.height = `${1920 * s}px`; }
+function playModalAnim() {
+  cancelAnimationFrame(modalRaf); const sc = SCENES[modalIdx]; modalMount.innerHTML = createStageHTML(sc); const start = performance.now();
+  (function step(now) { const p = clamp((now - start) / (GROW * 1000)); paint(modalMount, sc, p); if (p < 1) modalRaf = requestAnimationFrame(step); })(start);
+}
+function openModal(idx) {
+  modalIdx = idx; const sc = SCENES[idx];
+  const c = document.getElementById('modalCode'); c.textContent = sc.id; c.style.background = sc.accent;
+  document.getElementById('modalTitle').textContent = sc.name; document.getElementById('modalDesc').textContent = sc.desc;
+  modalBg.classList.add('open'); fitModal(); playModalAnim();
+}
+function closeModal() { cancelAnimationFrame(modalRaf); modalBg.classList.remove('open'); }
+document.getElementById('modalReplay').addEventListener('click', playModalAnim);
+document.getElementById('modalClose').addEventListener('click', closeModal);
+modalBg.addEventListener('click', (e) => { if (e.target === modalBg) closeModal(); });
+window.addEventListener('resize', () => { if (modalBg.classList.contains('open')) fitModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+/* board mode / ?t= */
+const QS = new URLSearchParams(location.search);
+if (QS.get('board') === '1') { document.body.classList.add('board-mode'); playing = false; requestAnimationFrame(resizeGridScalers); }
+if (QS.has('t')) { playing = false; btnPlay.textContent = '播放'; window.seek(parseFloat(QS.get('t')) || 0); }
+</script>
+</body>
+</html>
